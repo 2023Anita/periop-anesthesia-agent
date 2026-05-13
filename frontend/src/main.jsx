@@ -287,6 +287,19 @@ function ReportView({ report, setReport, onConfirm, busy }) {
       </div>
 
       <div className="report-grid">
+        <ReportBlock title="病例摘要">
+          <div className="summary-grid">
+            <SummaryItem label="年龄" value={report.patient_context.age} />
+            <SummaryItem label="性别" value={report.patient_context.sex} />
+            <SummaryItem label="身高/体重/BMI" value={report.patient_context.height_weight_bmi} />
+            <SummaryItem label="拟行手术" value={report.patient_context.planned_surgery} />
+            <SummaryItem label="手术属性" value={report.patient_context.urgency} />
+          </div>
+          <TagRow label="既往史" items={report.patient_context.history} />
+          <TagRow label="用药" items={report.patient_context.medications} />
+          <TagRow label="过敏/麻醉史" items={[...report.patient_context.allergies, ...report.patient_context.anesthesia_history]} />
+        </ReportBlock>
+
         <ReportBlock title="风险分层">
           <p>{report.asa_suggestion}</p>
           <p>{report.rcri_summary}</p>
@@ -309,10 +322,28 @@ function ReportView({ report, setReport, onConfirm, busy }) {
           {report.ecg_findings.map((ecg, index) => (
             <div key={`${ecg.source}-${index}`} className="ecg-box">
               <strong>{ecg.source}</strong>
-              <p>节律：{ecg.rhythm || '未抽取'}；心率：{ecg.heart_rate || '未抽取'}；QTc：{ecg.qtc || '未抽取'}</p>
+              <p>节律：{ecg.rhythm || '未抽取'}；心率：{ecg.heart_rate || '未抽取'}；PR：{ecg.pr_interval || '未抽取'}；QRS：{ecg.qrs_duration || '未抽取'}；QTc：{ecg.qtc || '未抽取'}</p>
+              <TagRow label="ST-T/缺血" items={ecg.st_t_changes} />
+              <TagRow label="传导" items={ecg.conduction_findings} />
+              <TagRow label="心律失常" items={ecg.arrhythmia_findings} />
               {ecg.anesthesia_risk_notes.map((note) => <small key={note}>{note}</small>)}
+              {ecg.missing_info.length > 0 && <small>缺失：{ecg.missing_info.join('；')}</small>}
             </div>
           ))}
+        </ReportBlock>
+
+        <ReportBlock title="关键化验">
+          {!report.lab_findings?.length && <p>未见可结构化识别的关键化验。</p>}
+          <div className="lab-table">
+            {report.lab_findings?.map((lab, index) => (
+              <div key={`${lab.name}-${index}`} className={`lab-row ${lab.interpretation}`}>
+                <strong>{lab.name}</strong>
+                <span>{lab.value}{lab.unit || ''}</span>
+                <em>{lab.interpretation}</em>
+                <small>{lab.anesthesia_relevance}</small>
+              </div>
+            ))}
+          </div>
         </ReportBlock>
 
         <ReportBlock title="缺失信息">
@@ -325,6 +356,16 @@ function ReportView({ report, setReport, onConfirm, busy }) {
 
         <ReportBlock title="补充检查与监测重点">
           <ul>{[...report.suggested_additional_checks, ...report.perioperative_monitoring_focus].map((item) => <li key={item}>{item}</li>)}</ul>
+        </ReportBlock>
+
+        <ReportBlock title="证据线索">
+          {!report.source_findings?.length && <p>暂无结构化证据线索。</p>}
+          {report.source_findings?.slice(0, 12).map((finding, index) => (
+            <div className="finding-row" key={`${finding.source}-${finding.fact}-${index}`}>
+              <strong>{finding.fact}</strong>
+              <small>{finding.source} · {finding.confidence}</small>
+            </div>
+          ))}
         </ReportBlock>
       </div>
 
@@ -351,5 +392,25 @@ function ReportBlock({ title, children }) {
   );
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+function SummaryItem({ label, value }) {
+  return (
+    <div className="summary-item">
+      <span>{label}</span>
+      <strong>{value || '待确认'}</strong>
+    </div>
+  );
+}
 
+function TagRow({ label, items }) {
+  const values = items?.filter(Boolean) || [];
+  return (
+    <div className="tag-row">
+      <span>{label}</span>
+      <div>
+        {values.length ? values.map((item) => <em key={item}>{item}</em>) : <small>待补充</small>}
+      </div>
+    </div>
+  );
+}
+
+createRoot(document.getElementById('root')).render(<App />);

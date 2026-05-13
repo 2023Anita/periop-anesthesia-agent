@@ -19,7 +19,7 @@ def test_create_case_text_document_and_analyze(tmp_path, monkeypatch):
         json={
             "filename": "manual.txt",
             "modality": "ecg",
-            "text": "患者高血压。心电图：窦性心律，心率 70 次/分，QTc: 460 ms。",
+            "text": "患者女，72岁，拟行髋关节置换术，高血压。心电图：窦性心律，心率 70 次/分，QTc: 460 ms。Hb 86 g/L。",
         },
     )
     assert doc_resp.status_code == 200
@@ -28,5 +28,7 @@ def test_create_case_text_document_and_analyze(tmp_path, monkeypatch):
     assert analyze_resp.status_code == 200
     report = analyze_resp.json()
     assert report["case_id"] == case_id
+    assert report["patient_context"]["age"] == "72"
+    assert report["patient_context"]["sex"] == "女"
     assert report["ecg_findings"]
-
+    assert report["lab_findings"]

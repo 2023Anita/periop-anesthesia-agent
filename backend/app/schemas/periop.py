@@ -91,12 +91,22 @@ class ECGFinding(BaseModel):
     clinician_review_required: bool = True
 
 
+class LabFinding(BaseModel):
+    name: str
+    value: str
+    unit: str | None = None
+    interpretation: Literal["low", "normal", "high", "critical", "unknown"] = "unknown"
+    anesthesia_relevance: str
+    source: str
+
+
 class PreopAssessmentReport(BaseModel):
     case_id: str
     generated_at: datetime
     patient_context: PatientContext
     source_findings: list[DocumentFinding] = Field(default_factory=list)
     ecg_findings: list[ECGFinding] = Field(default_factory=list)
+    lab_findings: list[LabFinding] = Field(default_factory=list)
     risk_flags: list[RiskFlag] = Field(default_factory=list)
     asa_suggestion: str
     rcri_summary: str
@@ -114,4 +124,3 @@ class PreopAssessmentReport(BaseModel):
 class ClinicianReviewUpdate(BaseModel):
     clinician_notes: str = ""
     review_status: ReviewStatus = ReviewStatus.clinician_confirmed
-

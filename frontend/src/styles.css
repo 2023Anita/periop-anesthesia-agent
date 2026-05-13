@@ -318,7 +318,8 @@ textarea {
 }
 
 .risk,
-.ecg-box {
+.ecg-box,
+.finding-row {
   border-left: 4px solid #91a4b7;
   padding: 10px 12px;
   margin-bottom: 10px;
@@ -359,10 +360,106 @@ textarea {
   color: #40576d;
 }
 
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.summary-item {
+  border: 1px solid #e1e8ef;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfdff;
+}
+
+.summary-item span,
+.tag-row > span {
+  display: block;
+  color: #6b7c8e;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.summary-item strong {
+  color: #263544;
+  font-size: 14px;
+}
+
+.tag-row {
+  margin-top: 8px;
+}
+
+.tag-row div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-row em {
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #e8f3f3;
+  color: #0f5f58;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.lab-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lab-row {
+  display: grid;
+  grid-template-columns: 72px 110px 80px 1fr;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e1e8ef;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfdff;
+}
+
+.lab-row em {
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 12px;
+  font-style: normal;
+  text-align: center;
+}
+
+.lab-row.low em,
+.lab-row.high em,
+.lab-row.critical em {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.lab-row small,
+.finding-row small {
+  color: #66788a;
+}
+
+.finding-row {
+  border-left-color: #0f766e;
+}
+
+.finding-row strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
 @media (max-width: 980px) {
   .app-shell,
   .grid,
-  .report-grid {
+  .report-grid,
+  .summary-grid,
+  .lab-row {
     grid-template-columns: 1fr;
   }
 

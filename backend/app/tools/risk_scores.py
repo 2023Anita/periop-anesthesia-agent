@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from app.schemas.periop import DocumentFinding, PatientContext, RiskFlag
 
 
@@ -11,14 +13,43 @@ HISTORY_TERMS = {
     "COPD/哮喘": ["copd", "慢阻肺", "哮喘"],
     "肾功能异常": ["肾功能不全", "肌酐升高", "ckd", "尿毒症"],
     "脑卒中": ["脑卒中", "脑梗", "脑出血", "stroke"],
+    "睡眠呼吸暂停风险": ["睡眠呼吸暂停", "OSA", "打鼾", "鼾症"],
 }
 
-MEDICATION_TERMS = ["阿司匹林", "氯吡格雷", "华法林", "利伐沙班", "达比加群", "胰岛素", "二甲双胍", "激素"]
+MEDICATION_TERMS = [
+    "阿司匹林",
+    "氯吡格雷",
+    "替格瑞洛",
+    "华法林",
+    "利伐沙班",
+    "阿哌沙班",
+    "达比加群",
+    "低分子肝素",
+    "胰岛素",
+    "二甲双胍",
+    "GLP-1",
+    "司美格鲁肽",
+    "激素",
+    "β受体阻滞剂",
+    "ACEI",
+    "ARB",
+]
 ALLERGY_TERMS = ["过敏", "青霉素", "头孢", "碘", "乳胶"]
 
 
 def build_patient_context(all_text: str) -> PatientContext:
     context = PatientContext()
+    context.age = _extract_first(all_text, [r"(\d{1,3})\s*岁", r"年龄[:：]?\s*(\d{1,3})"])
+    context.sex = _extract_sex(all_text)
+    context.planned_surgery = _extract_first(
+        all_text,
+        [
+            r"拟行[:：]?\s*([^。\n；;]{2,40}?(?:术|手术))",
+            r"拟行手术[:：]?\s*([^。\n；;]{2,40})",
+            r"手术名称[:：]?\s*([^。\n；;]{2,40})",
+        ],
+    )
+    context.height_weight_bmi = _extract_body_size(all_text)
     for name, terms in HISTORY_TERMS.items():
         if any(term.lower() in all_text.lower() for term in terms):
             context.history.append(name)
@@ -32,6 +63,9 @@ def build_patient_context(all_text: str) -> PatientContext:
         context.urgency = "急诊"
     elif "择期" in all_text:
         context.urgency = "择期"
+    for term in ["全麻异常", "困难插管", "困难气道", "恶性高热", "PONV", "术后恶心呕吐"]:
+        if term.lower() in all_text.lower():
+            context.anesthesia_history.append(term)
     return context
 
 
@@ -76,6 +110,15 @@ def build_risk_flags(context: PatientContext, all_text: str) -> list[RiskFlag]:
                 name="抗栓/出血风险",
                 severity="high",
                 rationale="资料中出现抗血小板或抗凝药物，围术期停药和桥接策略必须由医生确认。",
+                evidence=context.medications,
+            )
+        )
+    if any(med in context.medications for med in ["GLP-1", "司美格鲁肽"]):
+        flags.append(
+            RiskFlag(
+                name="胃排空延迟/误吸风险",
+                severity="medium",
+                rationale="资料中出现 GLP-1 类药物线索，术前禁食、胃排空和误吸风险需医生确认。",
                 evidence=context.medications,
             )
         )
@@ -124,3 +167,26 @@ def ponv_summary(all_text: str) -> str:
     hits = [term for term in terms if term.lower() in all_text.lower()]
     return f"PONV 风险草案：发现 {len(hits)} 项相关线索（{', '.join(hits) or '暂无'}），需补充吸烟史、既往 PONV 和术后镇痛计划。"
 
+
+def _extract_first(text: str, patterns: list[str]) -> str | None:
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    return None
+
+
+def _extract_sex(text: str) -> str | None:
+    if re.search(r"(患者)?\s*男|男性|性别[:：]?\s*男", text):
+        return "男"
+    if re.search(r"(患者)?\s*女|女性|性别[:：]?\s*女", text):
+        return "女"
+    return None
+
+
+def _extract_body_size(text: str) -> str | None:
+    height = _extract_first(text, [r"身高[:：]?\s*(\d{2,3}\s*cm)", r"(\d{2,3}\s*cm)"])
+    weight = _extract_first(text, [r"体重[:：]?\s*(\d{2,3}\s*kg)", r"(\d{2,3}\s*kg)"])
+    bmi = _extract_first(text, [r"BMI[:：]?\s*([0-9.]+)"])
+    parts = [part for part in [height, weight, f"BMI {bmi}" if bmi else None] if part]
+    return " / ".join(parts) if parts else None

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from app.schemas.periop import DocumentModality, DocumentRecord, PreopAssessmentReport, RiskFlag
 from app.tools.ecg import analyze_ecg_text
+from app.tools.lab_checks import build_lab_risk_flags, extract_lab_findings
 from app.tools.risk_scores import (
     asa_suggestion,
     build_patient_context,
@@ -34,6 +35,7 @@ def _build_deterministic_report(case_id: str, documents: list[DocumentRecord]) -
     all_text = "\n\n".join(text for _, text in doc_pairs)
     context = build_patient_context(all_text)
     findings = extract_source_findings(doc_pairs)
+    lab_findings = extract_lab_findings(doc_pairs)
 
     ecg_findings = []
     for doc in documents:
@@ -43,6 +45,7 @@ def _build_deterministic_report(case_id: str, documents: list[DocumentRecord]) -
                 ecg_findings.append(finding)
 
     risk_flags = build_risk_flags(context, all_text)
+    risk_flags.extend(build_lab_risk_flags(lab_findings))
     for finding in ecg_findings:
         for note in finding.anesthesia_risk_notes:
             severity = "high" if any(term in note for term in ["QTc", "ST-T", "缺血", "传导阻滞"]) else "medium"
@@ -62,6 +65,7 @@ def _build_deterministic_report(case_id: str, documents: list[DocumentRecord]) -
         patient_context=context,
         source_findings=findings,
         ecg_findings=ecg_findings,
+        lab_findings=lab_findings,
         risk_flags=risk_flags,
         asa_suggestion=asa_suggestion(context),
         rcri_summary=rcri_summary(context),
@@ -125,4 +129,3 @@ def _missing_information(context, all_text: str, has_ecg: bool) -> list[str]:
     if not has_ecg:
         missing.append("未见可结构化识别的心电图资料。")
     return missing
-

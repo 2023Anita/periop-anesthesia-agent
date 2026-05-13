@@ -14,7 +14,7 @@ def test_preop_workflow_extracts_ecg_risk_without_openai_key(monkeypatch):
         case_id="case-1",
         filename="ecg.txt",
         modality=DocumentModality.ecg,
-        extracted_text="心电图：窦性心律，心率 58 次/分，QTc 492 ms，ST-T改变。",
+        extracted_text="患者男，68岁，拟行择期胆囊切除术。心电图：窦性心律，心率 58 次/分，QTc 492 ms，ST-T改变。Hb 82 g/L，肌酐 130 umol/L。",
         extraction_notes=[],
         created_at=datetime.now(timezone.utc),
     )
@@ -22,6 +22,10 @@ def test_preop_workflow_extracts_ecg_risk_without_openai_key(monkeypatch):
     report = asyncio.run(run_preop_assessment("case-1", [doc]))
 
     assert report.ecg_findings
+    assert report.patient_context.age == "68"
+    assert report.patient_context.sex == "男"
+    assert report.patient_context.planned_surgery == "择期胆囊切除术"
+    assert report.lab_findings
     assert any(flag.name == "心电图相关麻醉风险" for flag in report.risk_flags)
+    assert any(flag.name.startswith("关键化验异常") for flag in report.risk_flags)
     assert "医生" in report.safety_notice
-

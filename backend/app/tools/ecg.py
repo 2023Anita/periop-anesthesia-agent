@@ -25,15 +25,24 @@ def analyze_ecg_text(source: str, text: str) -> ECGFinding | None:
 
     finding.st_t_changes = _collect_terms(
         normalized,
-        ["ST-T改变", "ST段压低", "ST段抬高", "T波倒置", "T波低平", "缺血"],
+        ["ST-T改变", "ST段压低", "ST段抬高", "T波倒置", "T波低平", "异常Q波", "缺血"],
     )
     finding.conduction_findings = _collect_terms(
         normalized,
-        ["房室传导阻滞", "右束支传导阻滞", "左束支传导阻滞", "一度房室传导阻滞", "二度房室传导阻滞", "三度房室传导阻滞"],
+        [
+            "房室传导阻滞",
+            "右束支传导阻滞",
+            "左束支传导阻滞",
+            "一度房室传导阻滞",
+            "二度房室传导阻滞",
+            "三度房室传导阻滞",
+            "完全性右束支传导阻滞",
+            "完全性左束支传导阻滞",
+        ],
     )
     finding.arrhythmia_findings = _collect_terms(
         normalized,
-        ["房颤", "心房颤动", "房扑", "室性早搏", "房性早搏", "室上速", "心动过缓", "心动过速"],
+        ["房颤", "心房颤动", "房扑", "室性早搏", "频发室早", "房性早搏", "室上速", "心动过缓", "心动过速", "起搏心律"],
     )
     finding.anesthesia_risk_notes = _ecg_risk_notes(finding, normalized)
     finding.missing_info = _missing_ecg_info(finding)
@@ -41,7 +50,7 @@ def analyze_ecg_text(source: str, text: str) -> ECGFinding | None:
 
 
 def _looks_like_ecg(text: str) -> bool:
-    keywords = ["心电图", "ecg", "ekg", "窦性", "st-t", "qtc", "qrs", "房颤", "传导阻滞"]
+    keywords = ["心电图", "ecg", "ekg", "窦性", "st-t", "qtc", "qrs", "房颤", "传导阻滞", "室性早搏", "心动过缓"]
     return any(keyword in text for keyword in keywords)
 
 
@@ -66,9 +75,16 @@ def _collect_terms(text: str, terms: list[str]) -> list[str]:
 
 def _ecg_risk_notes(finding: ECGFinding, text: str) -> list[str]:
     notes: list[str] = []
+    hr_value = _numeric_prefix(finding.heart_rate)
+    if hr_value is not None and hr_value < 50:
+        notes.append("明显心动过缓线索：需结合症状、传导阻滞和术中备用处置策略复核。")
+    if hr_value is not None and hr_value > 120:
+        notes.append("明显心动过速线索：需结合容量状态、感染、疼痛、心律失常和心功能评估。")
     if finding.qtc:
-        numbers = re.findall(r"\d+", finding.qtc)
-        if numbers and int(numbers[0]) >= 480:
+        qtc_value = _numeric_prefix(finding.qtc)
+        if qtc_value is not None and qtc_value >= 500:
+            notes.append("QTc 明显延长：需医生重点复核电解质、既往晕厥史和可能延长 QT 的围术期用药。")
+        elif qtc_value is not None and qtc_value >= 480:
             notes.append("QTc 延长：麻醉相关用药和电解质异常需医生重点复核。")
     if finding.arrhythmia_findings:
         notes.append("存在心律失常线索：需结合症状、既往病史、用药和血流动力学稳定性评估。")
@@ -91,3 +107,9 @@ def _missing_ecg_info(finding: ECGFinding) -> list[str]:
         missing.append("未抽取到 QTc。")
     return missing
 
+
+def _numeric_prefix(value: str | None) -> int | None:
+    if not value:
+        return None
+    numbers = re.findall(r"\d+", value)
+    return int(numbers[0]) if numbers else None
