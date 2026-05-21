@@ -17,6 +17,31 @@ This repository is a local, human-in-the-loop prototype for perioperative anesth
 
 It is designed as a reusable clinical AI engineering template, not as a production medical device.
 
+## Project at a Glance
+
+**In one sentence:** this is a doctor-reviewed local clinical AI agent template that uses perioperative anesthesia assessment as a realistic scenario for turning messy medical documents into a reviewable, traceable, exportable draft.
+
+It is not trying to replace clinicians. It answers a more practical engineering question:
+
+> How can an AI system organize clinical source material, surface risk clues, and list missing information while keeping final judgment with the clinician?
+
+| Clinical input | Raw state | What this repo demonstrates |
+| --- | --- | --- |
+| Pre-op notes | History, medication, allergy, and anesthesia details are mixed in free text | Extract patient context, history, medications, and review clues |
+| ECG report text | Rhythm, rate, QTc, ST-T changes, and missing fields are mixed together | Structure ECG findings and anesthesia-relevant risk notes |
+| Lab snippets | Hb, creatinine, electrolytes, and other values appear in fragments | Extract key labs and flag anesthesia-relevant abnormalities |
+| Clinician review | AI output still needs human editing and confirmation | Provide notes, confirmation status, and Markdown export |
+
+```text
+Synthetic pre-op materials
+  -> deterministic local extraction
+  -> ECG / lab / risk tools
+  -> optional OpenAI Agents SDK refinement
+  -> clinician review, confirmation, and export
+```
+
+The important design choice: the deterministic workflow is local and testable first; model-based refinement is optional and stays behind the clinician-review boundary.
+
 ## Maintainer and Build Stack
 
 | Maintainer | Built with |
