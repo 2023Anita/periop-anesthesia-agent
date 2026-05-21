@@ -11,6 +11,9 @@ Use this checklist before announcing or republishing the project.
 - [ ] License is shown as MIT.
 - [ ] Repository description is concise and developer-facing.
 - [ ] Topics include `clinical-ai`, `healthcare-ai`, `openai-agents-sdk`, `human-in-the-loop`, `fastapi`, `react`, `sqlite`.
+- [ ] Maintainer / Built with section renders clearly.
+- [ ] `scripts/start-demo.sh` starts both services on a clean machine.
+- [ ] `CODE_OF_CONDUCT.md` and `CITATION.cff` are visible.
 
 ## Local Validation
 
@@ -32,6 +35,7 @@ Use this checklist before announcing or republishing the project.
 - [ ] `Load sample case` creates a report.
 - [ ] Markdown export works.
 - [ ] UI language selection persists after refresh.
+- [ ] `./scripts/start-demo.sh` works from the repository root.
 
 ## Safety and Privacy
 
@@ -44,5 +48,6 @@ Use this checklist before announcing or republishing the project.
 ## Profile and Distribution
 
 - [ ] Pin the repository on the GitHub profile.
+- [ ] Put the repo in the first or second pinned slot.
 - [ ] Keep the public positioning aligned with clinical AI developer tooling.
 - [ ] Share with a short demo-first description and the GitHub URL.

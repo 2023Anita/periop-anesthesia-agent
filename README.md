@@ -17,6 +17,12 @@ This repository is a local, human-in-the-loop prototype for perioperative anesth
 
 It is designed as a reusable clinical AI engineering template, not as a production medical device.
 
+## Maintainer and Build Stack
+
+| Maintainer | Built with |
+| --- | --- |
+| <a href="https://github.com/2023Anita"><img src="https://avatars.githubusercontent.com/u/126993554?v=4" width="72" alt="2023Anita avatar"><br><strong>2023Anita</strong></a><br>Physician building practical clinical AI tools. | ![OpenAI Codex](https://img.shields.io/badge/Built%20with-OpenAI%20Codex-111827) ![OpenAI Agents SDK](https://img.shields.io/badge/OpenAI%20Agents%20SDK-orchestration-111827) ![FastAPI + React](https://img.shields.io/badge/FastAPI%20%2B%20React-local%20app-0f766e)<br>Codex is credited as an AI engineering tool, not as a human contributor. |
+
 ## Visual Overview
 
 | Clinical AI template | Safety boundary | Human-in-the-loop workflow |
@@ -45,7 +51,19 @@ Use this repo as a practical starting point for local, human-reviewed clinical A
 - Make clinician review, export, and traceability visible in the UI.
 - Separate UI localization from clinical report translation.
 
-## 3-Minute Quickstart
+## 60-Second Demo
+
+For the fastest local demo:
+
+```bash
+./scripts/start-demo.sh
+```
+
+Then open `http://127.0.0.1:5173`, click **Load sample case**, review the draft, and export Markdown.
+
+The script starts the backend on `8010` and the frontend on `5173`. Press `Ctrl+C` in the script terminal to stop both.
+
+## 3-Minute Manual Quickstart
 
 ```bash
 git clone <your-fork-or-repo-url>
@@ -180,9 +198,19 @@ Useful contributions are welcome, especially:
 
 Please keep medical claims conservative. This repository is a developer template and local prototype, not a production medical system.
 
+Good starting points:
+
+- Add an English synthetic sample case.
+- Add a Docker Compose demo path.
+- Add a PDF export option.
+- Add more safety eval fixtures.
+- Improve multilingual UI copy.
+
 ## More Docs
 
 - [Chinese README](docs/README.zh-CN.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Citation metadata](CITATION.cff)
 - [Launch checklist](docs/launch-checklist.md)
 - [Safety evals](docs/safety-evals.md)
 

@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+title: "periop-anesthesia-agent"
+message: "If you use this project as a clinical AI engineering template, please cite it using this metadata."
+type: software
+authors:
+  - family-names: "Anita"
+    given-names: "2023Anita"
+    website: "https://github.com/2023Anita"
+repository-code: "https://github.com/2023Anita/periop-anesthesia-agent"
+url: "https://github.com/2023Anita/periop-anesthesia-agent"
+abstract: "A doctor-reviewed clinical AI agent template for perioperative anesthesia assessment, built with FastAPI, React, SQLite, and the OpenAI Agents SDK."
+keywords:
+  - clinical-ai
+  - healthcare-ai
+  - openai-agents-sdk
+  - human-in-the-loop
+  - fastapi
+  - react
+license: MIT
+version: "0.1.0"
+date-released: "2026-05-21"
