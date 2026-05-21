@@ -1,12 +1,14 @@
 # periop-anesthesia-agent
 
+**Language:** English | [中文](docs/README.zh-CN.md) | [日本語](docs/README.ja.md) | [한국어](docs/README.ko.md) | [Français](docs/README.fr.md) | [Deutsch](docs/README.de.md)
+
 **A doctor-reviewed clinical AI agent template built with FastAPI, React, SQLite, and the OpenAI Agents SDK.**
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)
 ![OpenAI Agents SDK](https://img.shields.io/badge/OpenAI%20Agents%20SDK-ready-111827)
-![Tests](https://img.shields.io/badge/tests-12%20passing-16a34a)
+![Tests](https://img.shields.io/badge/tests-13%20passing-16a34a)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ![Demo](docs/assets/demo.gif)
@@ -14,6 +16,12 @@
 This repository is a local, human-in-the-loop prototype for perioperative anesthesia assessment. It turns synthetic pre-op notes, ECG text, and lab snippets into a structured draft that a clinician can review, edit, confirm, and export.
 
 It is designed as a reusable clinical AI engineering template, not as a production medical device.
+
+## Visual Overview
+
+| Clinical AI template | Safety boundary | Human-in-the-loop workflow |
+| --- | --- | --- |
+| ![Clinical AI Agent Template](docs/assets/generated/clinical-ai-agent-template.png) | ![Safety Boundary](docs/assets/generated/safety-boundary.png) | ![Human-in-the-loop Workflow](docs/assets/generated/human-in-the-loop-workflow.png) |
 
 ## Why This Exists
 
@@ -26,6 +34,16 @@ Clinical AI demos often skip the hard parts: messy source documents, safety boun
 - Optional OpenAI Agents SDK refinement when `OPENAI_API_KEY` is available
 - Safety guardrails for surgery clearance, medication dosing, emergency instructions, and patient-facing advice
 - Markdown export for clinician-reviewed drafts
+
+## For Clinical AI Developers
+
+Use this repo as a practical starting point for local, human-reviewed clinical AI apps:
+
+- Keep deterministic extraction and safety checks testable before adding model refinement.
+- Treat agent output as a draft artifact, not as a clinical decision.
+- Store only local demo data by default.
+- Make clinician review, export, and traceability visible in the UI.
+- Separate UI localization from clinical report translation.
 
 ## 3-Minute Quickstart
 
@@ -162,9 +180,11 @@ Useful contributions are welcome, especially:
 
 Please keep medical claims conservative. This repository is a developer template and local prototype, not a production medical system.
 
-## Chinese Docs
+## More Docs
 
-中文说明见 [docs/README.zh-CN.md](docs/README.zh-CN.md)。
+- [Chinese README](docs/README.zh-CN.md)
+- [Launch checklist](docs/launch-checklist.md)
+- [Safety evals](docs/safety-evals.md)
 
 ## License
 

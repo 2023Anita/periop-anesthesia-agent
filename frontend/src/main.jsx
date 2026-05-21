@@ -10,9 +10,13 @@ import {
   PlayCircle,
   Upload,
 } from 'lucide-react';
+import { LANGUAGES, TRANSLATIONS } from './i18n';
 import './styles.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8010';
+const DEFAULT_LANGUAGE = 'en';
+const LANGUAGE_STORAGE_KEY = 'periop-agent-language';
+const MODALITY_OPTIONS = ['clinical_note', 'ecg', 'lab', 'imaging', 'medication', 'airway', 'other'];
 
 async function requestJSON(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, options);
@@ -24,7 +28,14 @@ async function requestJSON(path, options = {}) {
   return payload;
 }
 
+function getInitialLanguage() {
+  const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  return TRANSLATIONS[stored] ? stored : DEFAULT_LANGUAGE;
+}
+
 function App() {
+  const [language, setLanguage] = useState(getInitialLanguage);
+  const t = TRANSLATIONS[language] || TRANSLATIONS[DEFAULT_LANGUAGE];
   const [cases, setCases] = useState([]);
   const [activeCase, setActiveCase] = useState(null);
   const [documents, setDocuments] = useState([]);
@@ -37,6 +48,10 @@ function App() {
   const [operation, setOperation] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+  }, [language]);
 
   useEffect(() => {
     loadCases().catch((err) => setError(err.message));
@@ -61,7 +76,7 @@ function App() {
     try {
       await task();
     } catch (err) {
-      setError(err.message || '操作失败，请检查后端服务是否正在运行。');
+      setError(err.message || t.genericError);
     } finally {
       setBusy(false);
       setOperation('');
@@ -75,26 +90,26 @@ function App() {
   }
 
   async function createCase() {
-    await runOperation('正在创建病例...', async () => {
+    await runOperation(t.creatingCase, async () => {
       const data = await requestJSON('/api/cases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: `术前评估 ${new Date().toLocaleString()}` }),
+        body: JSON.stringify({ title: `Pre-op assessment ${new Date().toLocaleString()}` }),
       });
       setActiveCase(data);
       await loadCases();
-      setMessage('新病例已创建。');
+      setMessage(t.caseCreated);
     });
   }
 
   async function loadSampleCase() {
-    await runOperation('正在加载样例病例并生成报告...', async () => {
+    await runOperation(t.loadingSample, async () => {
       const data = await requestJSON('/api/demo/sample-case', { method: 'POST' });
       setActiveCase(data.case);
       setDocuments(data.documents);
       setReport(data.report);
       await loadCases();
-      setMessage('Synthetic sample case loaded. The draft report is ready for review.');
+      setMessage(t.sampleLoaded);
     });
   }
 
@@ -112,7 +127,7 @@ function App() {
 
   async function addManualText() {
     if (!activeCase || !manualText.trim()) return;
-    await runOperation('正在加入病例资料...', async () => {
+    await runOperation(t.addingText, async () => {
       await requestJSON(`/api/cases/${activeCase.id}/documents/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -124,14 +139,14 @@ function App() {
       });
       setManualText('');
       await loadDocuments(activeCase.id);
-      setMessage('文本资料已加入病例。');
+      setMessage(t.textAdded);
     });
   }
 
   async function uploadFile(event) {
     const file = event.target.files?.[0];
     if (!activeCase || !file) return;
-    await runOperation('正在上传并抽取资料...', async () => {
+    await runOperation(t.uploading, async () => {
       const form = new FormData();
       form.append('file', file);
       form.append('modality', modality);
@@ -140,24 +155,24 @@ function App() {
         body: form,
       });
       await loadDocuments(activeCase.id);
-      setMessage('文件已上传并抽取。');
+      setMessage(t.fileUploaded);
       event.target.value = '';
     });
   }
 
   async function runAssessment() {
     if (!activeCase) return;
-    await runOperation('正在运行术前评估 workflow...', async () => {
+    await runOperation(t.runningAssessment, async () => {
       const data = await requestJSON(`/api/cases/${activeCase.id}/analyze/preop`, { method: 'POST' });
       setReport(data);
       await loadCases();
-      setMessage('术前麻醉评估草案已生成。');
+      setMessage(t.assessmentReady);
     });
   }
 
   async function confirmReport() {
     if (!activeCase || !report) return;
-    await runOperation('正在保存医生确认...', async () => {
+    await runOperation(t.savingReview, async () => {
       const data = await requestJSON(`/api/cases/${activeCase.id}/report/clinician-review`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -167,13 +182,13 @@ function App() {
         }),
       });
       setReport(data);
-      setMessage('医生确认状态已保存。');
+      setMessage(t.reviewSaved);
     });
   }
 
   async function checkSafety() {
     if (!safetyText.trim()) return;
-    await runOperation('正在检查安全边界...', async () => {
+    await runOperation(t.checkingSafety, async () => {
       const data = await requestJSON('/api/safety/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,9 +200,9 @@ function App() {
 
   async function exportReport() {
     if (!activeCase || !report) return;
-    await runOperation('正在导出 Markdown...', async () => {
+    await runOperation(t.exporting, async () => {
       const res = await fetch(`${API_BASE}/api/cases/${activeCase.id}/report/export.md`);
-      if (!res.ok) throw new Error('报告导出失败。');
+      if (!res.ok) throw new Error(t.genericError);
       const markdown = await res.text();
       const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -196,7 +211,7 @@ function App() {
       link.download = `periop-assessment-${activeCase.id}.md`;
       link.click();
       URL.revokeObjectURL(url);
-      setMessage('Markdown report exported.');
+      setMessage(t.exportDone);
     });
   }
 
@@ -207,13 +222,21 @@ function App() {
           <HeartPulse size={26} />
           <div>
             <h1>Periop Anesthesia Agent</h1>
-            <p>Doctor-reviewed clinical AI template</p>
+            <p>{t.brandSubtitle}</p>
           </div>
         </div>
-        <button className="primary" onClick={createCase} disabled={busy}>新建病例</button>
+        <label className="language-select">
+          <span>Language</span>
+          <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+            {LANGUAGES.map((item) => (
+              <option key={item.code} value={item.code}>{item.label}</option>
+            ))}
+          </select>
+        </label>
+        <button className="primary" onClick={createCase} disabled={busy}>{t.newCase}</button>
         <button className="sample-button" onClick={loadSampleCase} disabled={busy}>
           <PlayCircle size={17} />
-          Load sample case
+          {t.loadSample}
         </button>
         <div className="case-list">
           {cases.map((item) => (
@@ -226,29 +249,29 @@ function App() {
               <small>{item.status}</small>
             </button>
           ))}
-          {cases.length === 0 && <p className="sidebar-empty">No cases yet. Start with the sample.</p>}
+          {cases.length === 0 && <p className="sidebar-empty">{t.noCases}</p>}
         </div>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">LOCAL CLINICAL AI AGENT TEMPLATE</p>
-            <h2>{activeCase?.title || '请先创建病例'}</h2>
+            <p className="eyebrow">{t.templateEyebrow}</p>
+            <h2>{activeCase?.title || t.noCase}</h2>
           </div>
           <div className="status-strip">
-            <Stat icon={<FileText size={18} />} label="资料" value={documents.length} />
-            <Stat icon={<AlertTriangle size={18} />} label="高风险" value={highRiskCount} />
-            <Stat icon={<CheckCircle2 size={18} />} label="状态" value={report?.review_status || 'draft'} />
+            <Stat icon={<FileText size={18} />} label={t.documentsStat} value={documents.length} />
+            <Stat icon={<AlertTriangle size={18} />} label={t.highRiskStat} value={highRiskCount} />
+            <Stat icon={<CheckCircle2 size={18} />} label={t.statusStat} value={report?.review_status || 'draft'} />
           </div>
         </header>
 
         <div className="notice">
           <AlertTriangle size={18} />
-          Doctor-reviewed draft only. No autonomous diagnosis, dosing, emergency instructions, or surgery clearance.
+          {t.notice}
         </div>
 
-        {busy && <div className="busy-bar">{operation || '处理中...'}</div>}
+        {busy && <div className="busy-bar">{operation}</div>}
         {message && <div className="toast">{message}</div>}
         {error && <div className="error-banner">{error}</div>}
 
@@ -256,54 +279,50 @@ function App() {
           <section className="panel">
             <div className="panel-title">
               <Upload size={20} />
-              <h3>资料上传与输入</h3>
+              <h3>{t.uploadTitle}</h3>
             </div>
             <label className="field">
-              资料类型
+              {t.modality}
               <select value={modality} onChange={(event) => setModality(event.target.value)}>
-                <option value="clinical_note">术前病历</option>
-                <option value="ecg">心电图</option>
-                <option value="lab">化验单</option>
-                <option value="imaging">影像报告</option>
-                <option value="medication">用药</option>
-                <option value="airway">气道评估</option>
-                <option value="other">其他</option>
+                {MODALITY_OPTIONS.map((item) => (
+                  <option key={item} value={item}>{t.modalities[item]}</option>
+                ))}
               </select>
             </label>
             <label className="file-drop">
               <input type="file" onChange={uploadFile} disabled={!activeCase || busy} />
-              上传 PDF / Word / 图片 / TXT
+              {t.fileDrop}
             </label>
             <textarea
               value={manualText}
               onChange={(event) => setManualText(event.target.value)}
-              placeholder="粘贴术前病历、心电图报告、化验单文字..."
+              placeholder={t.manualPlaceholder}
             />
             <button className="secondary" onClick={addManualText} disabled={!activeCase || busy || !manualText.trim()}>
-              加入病例资料
+              {t.addDocument}
             </button>
           </section>
 
           <section className="panel">
             <div className="panel-title">
               <FileText size={20} />
-              <h3>抽取预览</h3>
+              <h3>{t.previewTitle}</h3>
             </div>
             <div className="doc-list">
-              {documents.length === 0 && <div className="empty-state">No documents yet. Load the sample case or add pre-op materials.</div>}
+              {documents.length === 0 && <div className="empty-state">{t.emptyDocuments}</div>}
               {documents.map((doc) => (
                 <article key={doc.id} className="doc-card">
                   <div>
                     <strong>{doc.filename}</strong>
                     <span>{doc.modality}</span>
                   </div>
-                  <p>{doc.extracted_text || '未抽取到文本。'}</p>
+                  <p>{doc.extracted_text || t.noExtractedText}</p>
                   {doc.extraction_notes?.map((note) => <small key={note}>{note}</small>)}
                 </article>
               ))}
             </div>
             <button className="primary" onClick={runAssessment} disabled={!activeCase || busy || documents.length === 0}>
-              生成术前麻醉评估草案
+              {t.runAssessment}
             </button>
           </section>
         </div>
@@ -311,21 +330,21 @@ function App() {
         <section className="panel safety-panel">
           <div className="panel-title">
             <AlertTriangle size={20} />
-            <h3>医疗安全边界检查</h3>
+            <h3>{t.safetyTitle}</h3>
           </div>
           <div className="safety-check-row">
             <textarea
               value={safetyText}
               onChange={(event) => setSafetyText(event.target.value)}
-              placeholder="试试：这个患者能不能手术？诱导药给多少剂量？"
+              placeholder={t.safetyPlaceholder}
             />
             <button className="secondary" onClick={checkSafety} disabled={busy || !safetyText.trim()}>
-              检查边界
+              {t.checkBoundary}
             </button>
           </div>
           {safetyResult && (
             <div className={safetyResult.allowed ? 'safety-result allowed' : 'safety-result blocked'}>
-              <strong>{safetyResult.allowed ? '允许：医生辅助任务' : '拦截：超出安全边界'}</strong>
+              <strong>{safetyResult.allowed ? t.safetyAllowed : t.safetyBlocked}</strong>
               <span>{safetyResult.category}</span>
               <p>{safetyResult.reason}</p>
               <small>{safetyResult.safe_response}</small>
@@ -333,7 +352,14 @@ function App() {
           )}
         </section>
 
-        <ReportView report={report} setReport={setReport} onConfirm={confirmReport} onExport={exportReport} busy={busy} />
+        <ReportView
+          report={report}
+          setReport={setReport}
+          onConfirm={confirmReport}
+          onExport={exportReport}
+          busy={busy}
+          t={t}
+        />
       </section>
     </main>
   );
@@ -349,13 +375,13 @@ function Stat({ icon, label, value }) {
   );
 }
 
-function ReportView({ report, setReport, onConfirm, onExport, busy }) {
+function ReportView({ report, setReport, onConfirm, onExport, busy, t }) {
   if (!report) {
     return (
       <section className="panel empty-report">
         <Activity size={28} />
-        <h3>等待生成评估草案</h3>
-        <p>Load the synthetic sample or add pre-op materials to generate a structured doctor-reviewed draft.</p>
+        <h3>{t.emptyReportTitle}</h3>
+        <p>{t.emptyReportBody}</p>
       </section>
     );
   }
@@ -364,40 +390,40 @@ function ReportView({ report, setReport, onConfirm, onExport, busy }) {
     <section className="report">
       <div className="report-header">
         <div>
-          <p className="eyebrow">术前麻醉评估草案</p>
-          <h3>需麻醉医生复核确认</h3>
+          <p className="eyebrow">{t.reportEyebrow}</p>
+          <h3>{t.reportTitle}</h3>
         </div>
         <div className="report-actions">
           <button className="secondary icon-button" onClick={onExport} disabled={busy}>
             <Download size={17} />
-            Export Markdown
+            {t.exportMarkdown}
           </button>
-          <button className="primary" onClick={onConfirm} disabled={busy}>保存医生确认</button>
+          <button className="primary" onClick={onConfirm} disabled={busy}>{t.saveReview}</button>
         </div>
       </div>
 
       <div className="report-grid">
-        <ReportBlock title="病例摘要">
+        <ReportBlock title={t.context}>
           <div className="summary-grid">
-            <SummaryItem label="年龄" value={report.patient_context.age} />
-            <SummaryItem label="性别" value={report.patient_context.sex} />
-            <SummaryItem label="身高/体重/BMI" value={report.patient_context.height_weight_bmi} />
-            <SummaryItem label="拟行手术" value={report.patient_context.planned_surgery} />
-            <SummaryItem label="手术属性" value={report.patient_context.urgency} />
+            <SummaryItem label={t.age} value={report.patient_context.age} t={t} />
+            <SummaryItem label={t.sex} value={report.patient_context.sex} t={t} />
+            <SummaryItem label={t.bodySize} value={report.patient_context.height_weight_bmi} t={t} />
+            <SummaryItem label={t.plannedSurgery} value={report.patient_context.planned_surgery} t={t} />
+            <SummaryItem label={t.urgency} value={report.patient_context.urgency} t={t} />
           </div>
-          <TagRow label="既往史" items={report.patient_context.history} />
-          <TagRow label="用药" items={report.patient_context.medications} />
-          <TagRow label="过敏/麻醉史" items={[...report.patient_context.allergies, ...report.patient_context.anesthesia_history]} />
+          <TagRow label={t.history} items={report.patient_context.history} t={t} />
+          <TagRow label={t.medications} items={report.patient_context.medications} t={t} />
+          <TagRow label={t.allergyAnesthesia} items={[...report.patient_context.allergies, ...report.patient_context.anesthesia_history]} t={t} />
         </ReportBlock>
 
-        <ReportBlock title="风险分层">
+        <ReportBlock title={t.riskStratification}>
           <p>{report.asa_suggestion}</p>
           <p>{report.rcri_summary}</p>
           <p>{report.stop_bang_summary}</p>
           <p>{report.ponv_summary}</p>
         </ReportBlock>
 
-        <ReportBlock title="主要风险标签">
+        <ReportBlock title={t.riskFlags}>
           {report.risk_flags.map((flag, index) => (
             <div key={`${flag.name}-${index}`} className={`risk ${flag.severity}`}>
               <strong>{flag.name}</strong>
@@ -407,23 +433,27 @@ function ReportView({ report, setReport, onConfirm, onExport, busy }) {
           ))}
         </ReportBlock>
 
-        <ReportBlock title="心电图发现">
-          {report.ecg_findings.length === 0 && <p>未见可结构化识别的心电图资料。</p>}
+        <ReportBlock title={t.ecgFindings}>
+          {report.ecg_findings.length === 0 && <p>{t.noEcg}</p>}
           {report.ecg_findings.map((ecg, index) => (
             <div key={`${ecg.source}-${index}`} className="ecg-box">
               <strong>{ecg.source}</strong>
-              <p>节律：{ecg.rhythm || '未抽取'}；心率：{ecg.heart_rate || '未抽取'}；PR：{ecg.pr_interval || '未抽取'}；QRS：{ecg.qrs_duration || '未抽取'}；QTc：{ecg.qtc || '未抽取'}</p>
-              <TagRow label="ST-T/缺血" items={ecg.st_t_changes} />
-              <TagRow label="传导" items={ecg.conduction_findings} />
-              <TagRow label="心律失常" items={ecg.arrhythmia_findings} />
+              <p>
+                {t.rhythm}: {ecg.rhythm || t.notExtracted}; {t.heartRate}: {ecg.heart_rate || t.notExtracted};
+                PR: {ecg.pr_interval || t.notExtracted}; QRS: {ecg.qrs_duration || t.notExtracted};
+                QTc: {ecg.qtc || t.notExtracted}
+              </p>
+              <TagRow label={t.stt} items={ecg.st_t_changes} t={t} />
+              <TagRow label={t.conduction} items={ecg.conduction_findings} t={t} />
+              <TagRow label={t.arrhythmia} items={ecg.arrhythmia_findings} t={t} />
               {ecg.anesthesia_risk_notes.map((note) => <small key={note}>{note}</small>)}
-              {ecg.missing_info.length > 0 && <small>缺失：{ecg.missing_info.join('；')}</small>}
+              {ecg.missing_info.length > 0 && <small>{t.missing}: {ecg.missing_info.join('；')}</small>}
             </div>
           ))}
         </ReportBlock>
 
-        <ReportBlock title="关键化验">
-          {!report.lab_findings?.length && <p>未见可结构化识别的关键化验。</p>}
+        <ReportBlock title={t.labs}>
+          {!report.lab_findings?.length && <p>{t.noLabs}</p>}
           <div className="lab-table">
             {report.lab_findings?.map((lab, index) => (
               <div key={`${lab.name}-${index}`} className={`lab-row ${lab.interpretation}`}>
@@ -436,20 +466,20 @@ function ReportView({ report, setReport, onConfirm, onExport, busy }) {
           </div>
         </ReportBlock>
 
-        <ReportBlock title="缺失信息">
+        <ReportBlock title={t.missingInfo}>
           <ul>{report.missing_information.map((item) => <li key={item}>{item}</li>)}</ul>
         </ReportBlock>
 
-        <ReportBlock title="建议追问">
+        <ReportBlock title={t.followUp}>
           <ul>{report.suggested_follow_up_questions.map((item) => <li key={item}>{item}</li>)}</ul>
         </ReportBlock>
 
-        <ReportBlock title="补充检查与监测重点">
+        <ReportBlock title={t.checksMonitoring}>
           <ul>{[...report.suggested_additional_checks, ...report.perioperative_monitoring_focus].map((item) => <li key={item}>{item}</li>)}</ul>
         </ReportBlock>
 
-        <ReportBlock title="证据线索">
-          {!report.source_findings?.length && <p>暂无结构化证据线索。</p>}
+        <ReportBlock title={t.evidence}>
+          {!report.source_findings?.length && <p>{t.noEvidence}</p>}
           {report.source_findings?.slice(0, 12).map((finding, index) => (
             <div className="finding-row" key={`${finding.source}-${finding.fact}-${index}`}>
               <strong>{finding.fact}</strong>
@@ -460,11 +490,11 @@ function ReportView({ report, setReport, onConfirm, onExport, busy }) {
       </div>
 
       <label className="field clinician-notes">
-        医生备注与确认
+        {t.clinicianNotes}
         <textarea
           value={report.clinician_notes || ''}
           onChange={(event) => setReport({ ...report, clinician_notes: event.target.value })}
-          placeholder="麻醉医生在这里修改、补充并确认..."
+          placeholder={t.clinicianPlaceholder}
         />
       </label>
 
@@ -482,22 +512,22 @@ function ReportBlock({ title, children }) {
   );
 }
 
-function SummaryItem({ label, value }) {
+function SummaryItem({ label, value, t }) {
   return (
     <div className="summary-item">
       <span>{label}</span>
-      <strong>{value || '待确认'}</strong>
+      <strong>{value || t.needsConfirmation}</strong>
     </div>
   );
 }
 
-function TagRow({ label, items }) {
+function TagRow({ label, items, t }) {
   const values = items?.filter(Boolean) || [];
   return (
     <div className="tag-row">
       <span>{label}</span>
       <div>
-        {values.length ? values.map((item) => <em key={item}>{item}</em>) : <small>待补充</small>}
+        {values.length ? values.map((item) => <em key={item}>{item}</em>) : <small>{t.toSupplement}</small>}
       </div>
     </div>
   );
