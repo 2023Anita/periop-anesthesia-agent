@@ -74,6 +74,24 @@ textarea {
   color: white;
 }
 
+.sample-button,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sample-button {
+  min-height: 42px;
+  border: 1px solid rgba(94, 234, 212, 0.42);
+  border-radius: 8px;
+  padding: 0 16px;
+  background: rgba(94, 234, 212, 0.12);
+  color: #f7fbff;
+  cursor: pointer;
+}
+
 .secondary {
   background: #dce8ee;
   color: #17202a;
@@ -89,6 +107,13 @@ button:disabled {
   flex-direction: column;
   gap: 10px;
   overflow: auto;
+}
+
+.sidebar-empty {
+  margin: 0;
+  color: #9fb4c8;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .case {
@@ -158,6 +183,8 @@ button:disabled {
 
 .notice,
 .toast,
+.busy-bar,
+.error-banner,
 .safety {
   display: flex;
   align-items: center;
@@ -176,6 +203,20 @@ button:disabled {
   margin-top: 12px;
   background: #dff7ef;
   color: #0d5d52;
+}
+
+.busy-bar {
+  margin-top: 12px;
+  border: 1px solid #b9d8ff;
+  background: #eaf4ff;
+  color: #174d86;
+}
+
+.error-banner {
+  margin-top: 12px;
+  border: 1px solid #efb3b3;
+  background: #fff1f1;
+  color: #8a1f1f;
 }
 
 .grid,
@@ -266,6 +307,15 @@ textarea {
   margin-bottom: 14px;
 }
 
+.empty-state {
+  border: 1px dashed #c7d3df;
+  border-radius: 8px;
+  padding: 18px;
+  background: #f8fbfd;
+  color: #64748b;
+  text-align: center;
+}
+
 .doc-card {
   border: 1px solid #e0e7ee;
   border-radius: 8px;
@@ -300,6 +350,13 @@ textarea {
 .report {
   margin-top: 16px;
   padding: 18px;
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .report-block {

@@ -14,3 +14,10 @@ def test_safety_allows_risk_summary():
 
     assert result.allowed is True
     assert result.category == "allowed_support"
+
+
+def test_safety_blocks_surgery_clearance():
+    result = check_medical_safety("这个患者能不能手术？")
+
+    assert result.allowed is False
+    assert result.category == "surgery_clearance"

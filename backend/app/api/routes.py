@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import PlainTextResponse
 
 from app.agents.safety import check_medical_safety
 from app.agents.workflow import run_preop_assessment
@@ -9,6 +12,7 @@ from app.schemas.periop import (
     CaseCreate,
     CaseSummary,
     ClinicianReviewUpdate,
+    DemoCaseResponse,
     DocumentModality,
     DocumentRecord,
     PreopAssessmentReport,
@@ -17,9 +21,12 @@ from app.schemas.periop import (
     TextDocumentCreate,
 )
 from app.tools.document_extractors import extract_document_text
+from app.tools.report_export import render_report_markdown
 
 
 router = APIRouter()
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+SAMPLE_CASE_PATH = PROJECT_ROOT / "data" / "samples" / "sample-preop-ecg.txt"
 
 
 @router.get("/cases", response_model=list[CaseSummary])
@@ -94,12 +101,45 @@ async def analyze_preop(case_id: str) -> PreopAssessmentReport:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.post("/demo/sample-case", response_model=DemoCaseResponse)
+async def create_sample_case() -> DemoCaseResponse:
+    if not SAMPLE_CASE_PATH.exists():
+        raise HTTPException(status_code=500, detail="Sample case file is missing.")
+
+    sample_text = SAMPLE_CASE_PATH.read_text(encoding="utf-8").strip()
+    case = store.create_case("Sample perioperative assessment case")
+    document = store.add_document(
+        case_id=case.id,
+        filename=SAMPLE_CASE_PATH.name,
+        modality=DocumentModality.ecg,
+        extracted_text=sample_text,
+        extraction_notes=["Loaded from the synthetic public demo sample."],
+    )
+    report = await run_preop_assessment(case.id, [document])
+    saved_report = store.save_report(report)
+    return DemoCaseResponse(case=store.get_case(case.id), documents=[document], report=saved_report)
+
+
 @router.get("/cases/{case_id}/report", response_model=PreopAssessmentReport)
 def get_report(case_id: str) -> PreopAssessmentReport:
     try:
         return store.get_report(case_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/cases/{case_id}/report/export.md", response_class=PlainTextResponse)
+def export_report_markdown(case_id: str) -> PlainTextResponse:
+    try:
+        report = store.get_report(case_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    filename = f"periop-assessment-{case_id}.md"
+    return PlainTextResponse(
+        render_report_markdown(report),
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.patch("/cases/{case_id}/report/clinician-review", response_model=PreopAssessmentReport)

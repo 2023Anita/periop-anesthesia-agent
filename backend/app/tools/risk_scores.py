@@ -57,7 +57,7 @@ def build_patient_context(all_text: str) -> PatientContext:
         if term.lower() in all_text.lower():
             context.medications.append(term)
     for term in ALLERGY_TERMS:
-        if term.lower() in all_text.lower():
+        if _contains_unnegated_term(all_text, term):
             context.allergies.append(term)
     if "急诊" in all_text:
         context.urgency = "急诊"
@@ -79,7 +79,7 @@ def extract_source_findings(documents: list[tuple[str, str]]) -> list[DocumentFi
             if medication.lower() in text.lower():
                 findings.append(DocumentFinding(source=source, fact=f"发现用药线索：{medication}", confidence="medium"))
         for allergy in ALLERGY_TERMS:
-            if allergy.lower() in text.lower():
+            if _contains_unnegated_term(text, allergy):
                 findings.append(DocumentFinding(source=source, fact=f"发现过敏/相关线索：{allergy}", confidence="medium"))
     return findings
 
@@ -174,6 +174,14 @@ def _extract_first(text: str, patterns: list[str]) -> str | None:
         if match:
             return match.group(1).strip()
     return None
+
+
+def _contains_unnegated_term(text: str, term: str) -> bool:
+    for match in re.finditer(re.escape(term), text, flags=re.IGNORECASE):
+        prefix = text[max(0, match.start() - 8) : match.start()]
+        if not any(negation in prefix for negation in ["否认", "无", "未见", "没有", "无明确"]):
+            return True
+    return False
 
 
 def _extract_sex(text: str) -> str | None:

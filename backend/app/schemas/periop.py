@@ -136,3 +136,9 @@ class SafetyCheckResponse(BaseModel):
     reason: str
     safe_response: str
     matched_terms: list[str] = Field(default_factory=list)
+
+
+class DemoCaseResponse(BaseModel):
+    case: CaseSummary
+    documents: list[DocumentRecord]
+    report: PreopAssessmentReport

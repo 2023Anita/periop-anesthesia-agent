@@ -1,31 +1,40 @@
-# 麻醉围术期 Agent 本地原型
+# periop-anesthesia-agent
 
-本项目是第一阶段原型：本地 Web 医生工作台 + FastAPI 后端 + OpenAI Agents SDK 工作流骨架。
+**A doctor-reviewed clinical AI agent template built with FastAPI, React, SQLite, and the OpenAI Agents SDK.**
 
-## 当前能力
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)
+![OpenAI Agents SDK](https://img.shields.io/badge/OpenAI%20Agents%20SDK-ready-111827)
+![Tests](https://img.shields.io/badge/tests-12%20passing-16a34a)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-- 创建本地病例 session
-- 上传/输入术前资料
-- 抽取 PDF、Word、TXT 文本
-- 图片资料预留 OCR 接口，若本机安装 Tesseract 则自动尝试 OCR
-- 心电图报告/OCR 文本级结构化识别
-- 生成麻醉术前评估草案
-- 医生编辑并确认报告
-- 本地 SQLite 保存病例、资料和报告
+![Demo](docs/assets/demo.gif)
 
-## 安全边界
+This repository is a local, human-in-the-loop prototype for perioperative anesthesia assessment. It turns synthetic pre-op notes, ECG text, and lab snippets into a structured draft that a clinician can review, edit, confirm, and export.
 
-这是麻醉医生辅助工具原型，不是自动诊断或治疗系统。所有输出都必须由麻醉医生复核确认。
+It is designed as a reusable clinical AI engineering template, not as a production medical device.
 
-第一阶段不提供：
+## Why This Exists
 
-- 自动决定是否可以手术
-- 麻醉药物剂量
-- 抢救处置指令
-- 直接面向患者的诊疗建议
-- 12 导联心电图波形级自动诊断
+Clinical AI demos often skip the hard parts: messy source documents, safety boundaries, deterministic fallback behavior, and clinician review. This project keeps those parts visible.
 
-## 启动后端
+- Local FastAPI backend with SQLite persistence
+- React/Vite clinician workbench
+- Synthetic sample case for a 30-second demo
+- Deterministic extraction workflow when no API key is configured
+- Optional OpenAI Agents SDK refinement when `OPENAI_API_KEY` is available
+- Safety guardrails for surgery clearance, medication dosing, emergency instructions, and patient-facing advice
+- Markdown export for clinician-reviewed drafts
+
+## 3-Minute Quickstart
+
+```bash
+git clone <your-fork-or-repo-url>
+cd "periop-anesthesia-agent"
+```
+
+Start the backend:
 
 ```bash
 cd "backend"
@@ -35,15 +44,7 @@ pip install -e ".[dev]"
 uvicorn app.main:app --reload --port 8010
 ```
 
-可选：配置真实 OpenAI Agents SDK 调用。
-
-```bash
-export OPENAI_API_KEY="sk-..."
-```
-
-没有 API key 时，系统会使用本地确定性 workflow，便于先验证闭环。
-
-## 启动前端
+Start the frontend in another terminal:
 
 ```bash
 cd "frontend"
@@ -51,20 +52,120 @@ npm install
 npm run dev
 ```
 
-前端默认请求 `http://127.0.0.1:8010`。
+Open `http://127.0.0.1:5173`, click **Load sample case**, then review and export the generated draft.
 
-## 本地测试
+Optional OpenAI Agents SDK refinement:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+Without an API key, the app still runs with the local deterministic workflow.
+
+## Architecture
+
+![Architecture](docs/assets/architecture.png)
+
+```mermaid
+flowchart LR
+  A["React clinician workbench"] --> B["FastAPI routes"]
+  B --> C["SQLite case store"]
+  B --> D["Document extractors"]
+  D --> E["Deterministic clinical extraction"]
+  E --> F["ECG and lab risk tools"]
+  F --> G["Pre-op assessment draft"]
+  G --> H{"OPENAI_API_KEY?"}
+  H -- "No" --> I["Doctor-reviewed report"]
+  H -- "Yes" --> J["OpenAI Agents SDK orchestrator"]
+  J --> I
+  I --> K["Clinician notes and Markdown export"]
+```
+
+The OpenAI Agents SDK layer is intentionally a refinement layer. The baseline workflow remains deterministic and testable so the demo can run locally without network calls.
+
+## Safety Boundary
+
+This project is a doctor-facing assistant prototype. It must not be used as an autonomous diagnosis, treatment, dosing, or surgery-clearance system.
+
+It refuses or redirects requests that ask for:
+
+- Whether a patient can or cannot have surgery
+- Anesthesia or medication dosage
+- Emergency rescue instructions
+- Medication stop/switch/bridging decisions
+- Patient-facing individualized medical advice
+
+All generated content is a draft for clinician review only.
+
+## Example Output
+
+The synthetic sample case produces a structured report with:
+
+- Patient context: age, sex, planned surgery, history, medications, allergies
+- ECG findings: rhythm, heart rate, QTc, ST-T changes, missing ECG fields
+- Lab findings: Hb, creatinine, and interpretation
+- Risk flags: cardiovascular risk, antiplatelet/bleeding risk, ECG-related risk
+- Missing information and follow-up questions
+- Additional checks and monitoring focus
+- Safety notice and clinician confirmation status
+
+Reports can be exported as Markdown from the web UI.
+
+## Tests
 
 ```bash
 cd "backend"
-pytest
+".venv/bin/python" -m pytest
 ```
 
-## 本地评测集
+Current coverage includes:
+
+- Case creation, document input, and pre-op analysis
+- One-click sample demo flow
+- Markdown report export
+- ECG text extraction
+- Lab abnormality detection
+- Safety guardrails
+- OpenAI Agents SDK orchestrator construction
+
+Frontend production build:
 
 ```bash
-cd "backend"
-python -m app.evals.run_local
+cd "frontend"
+npm run build
 ```
 
-评测覆盖术前评估病例、心电图/化验异常、资料缺失和医疗越界请求。
+## Repository Topics
+
+Recommended GitHub topics:
+
+`openai-agents-sdk`, `clinical-ai`, `healthcare-ai`, `fastapi`, `react`, `sqlite`, `human-in-the-loop`, `medical-ai`
+
+## Roadmap
+
+- Export clinician-reviewed reports to PDF
+- Add English synthetic sample data
+- Add structured safety evaluation cases
+- Add optional tracing view for Agents SDK refinement
+- Add Docker Compose for one-command startup
+- Add more clinician-reviewed synthetic perioperative scenarios
+
+## Contributing
+
+Useful contributions are welcome, especially:
+
+- Safer clinical AI UX patterns
+- Better synthetic sample cases
+- Tests for safety boundaries and edge cases
+- Documentation improvements for clinical AI developers
+- Small, reviewable frontend polish
+
+Please keep medical claims conservative. This repository is a developer template and local prototype, not a production medical system.
+
+## Chinese Docs
+
+中文说明见 [docs/README.zh-CN.md](docs/README.zh-CN.md)。
+
+## License
+
+MIT

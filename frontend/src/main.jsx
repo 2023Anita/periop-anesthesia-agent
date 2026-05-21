@@ -1,9 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, AlertTriangle, CheckCircle2, FileText, HeartPulse, Upload } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  FileText,
+  HeartPulse,
+  PlayCircle,
+  Upload,
+} from 'lucide-react';
 import './styles.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8010';
+
+async function requestJSON(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, options);
+  const contentType = res.headers.get('content-type') || '';
+  const payload = contentType.includes('application/json') ? await res.json() : await res.text();
+  if (!res.ok) {
+    throw new Error(payload?.detail || payload || `Request failed with status ${res.status}`);
+  }
+  return payload;
+}
 
 function App() {
   const [cases, setCases] = useState([]);
@@ -15,15 +34,17 @@ function App() {
   const [safetyText, setSafetyText] = useState('这个患者能不能手术？');
   const [safetyResult, setSafetyResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState('');
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    loadCases();
+    loadCases().catch((err) => setError(err.message));
   }, []);
 
   useEffect(() => {
     if (activeCase) {
-      loadDocuments(activeCase.id);
+      loadDocuments(activeCase.id).catch((err) => setError(err.message));
       loadReport(activeCase.id);
     }
   }, [activeCase]);
@@ -32,50 +53,67 @@ function App() {
     return report?.risk_flags?.filter((flag) => ['high', 'critical'].includes(flag.severity)).length || 0;
   }, [report]);
 
+  async function runOperation(label, task) {
+    setBusy(true);
+    setOperation(label);
+    setMessage('');
+    setError('');
+    try {
+      await task();
+    } catch (err) {
+      setError(err.message || '操作失败，请检查后端服务是否正在运行。');
+    } finally {
+      setBusy(false);
+      setOperation('');
+    }
+  }
+
   async function loadCases() {
-    const res = await fetch(`${API_BASE}/api/cases`);
-    const data = await res.json();
+    const data = await requestJSON('/api/cases');
     setCases(data);
     if (!activeCase && data.length) setActiveCase(data[0]);
   }
 
   async function createCase() {
-    setBusy(true);
-    setMessage('');
-    try {
-      const res = await fetch(`${API_BASE}/api/cases`, {
+    await runOperation('正在创建病例...', async () => {
+      const data = await requestJSON('/api/cases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: `术前评估 ${new Date().toLocaleString()}` }),
       });
-      const data = await res.json();
       setActiveCase(data);
       await loadCases();
-    } finally {
-      setBusy(false);
-    }
+      setMessage('新病例已创建。');
+    });
+  }
+
+  async function loadSampleCase() {
+    await runOperation('正在加载样例病例并生成报告...', async () => {
+      const data = await requestJSON('/api/demo/sample-case', { method: 'POST' });
+      setActiveCase(data.case);
+      setDocuments(data.documents);
+      setReport(data.report);
+      await loadCases();
+      setMessage('Synthetic sample case loaded. The draft report is ready for review.');
+    });
   }
 
   async function loadDocuments(caseId) {
-    const res = await fetch(`${API_BASE}/api/cases/${caseId}/documents`);
-    setDocuments(await res.json());
+    setDocuments(await requestJSON(`/api/cases/${caseId}/documents`));
   }
 
   async function loadReport(caseId) {
-    const res = await fetch(`${API_BASE}/api/cases/${caseId}/report`);
-    if (res.ok) {
-      setReport(await res.json());
-    } else {
+    try {
+      setReport(await requestJSON(`/api/cases/${caseId}/report`));
+    } catch {
       setReport(null);
     }
   }
 
   async function addManualText() {
     if (!activeCase || !manualText.trim()) return;
-    setBusy(true);
-    setMessage('');
-    try {
-      await fetch(`${API_BASE}/api/cases/${activeCase.id}/documents/text`, {
+    await runOperation('正在加入病例资料...', async () => {
+      await requestJSON(`/api/cases/${activeCase.id}/documents/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -87,56 +125,40 @@ function App() {
       setManualText('');
       await loadDocuments(activeCase.id);
       setMessage('文本资料已加入病例。');
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   async function uploadFile(event) {
     const file = event.target.files?.[0];
     if (!activeCase || !file) return;
-    setBusy(true);
-    setMessage('');
-    try {
+    await runOperation('正在上传并抽取资料...', async () => {
       const form = new FormData();
       form.append('file', file);
       form.append('modality', modality);
-      await fetch(`${API_BASE}/api/cases/${activeCase.id}/documents`, {
+      await requestJSON(`/api/cases/${activeCase.id}/documents`, {
         method: 'POST',
         body: form,
       });
       await loadDocuments(activeCase.id);
       setMessage('文件已上传并抽取。');
-    } finally {
-      setBusy(false);
       event.target.value = '';
-    }
+    });
   }
 
   async function runAssessment() {
     if (!activeCase) return;
-    setBusy(true);
-    setMessage('');
-    try {
-      const res = await fetch(`${API_BASE}/api/cases/${activeCase.id}/analyze/preop`, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage(data.detail || '评估失败。');
-        return;
-      }
+    await runOperation('正在运行术前评估 workflow...', async () => {
+      const data = await requestJSON(`/api/cases/${activeCase.id}/analyze/preop`, { method: 'POST' });
       setReport(data);
       await loadCases();
       setMessage('术前麻醉评估草案已生成。');
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   async function confirmReport() {
     if (!activeCase || !report) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/cases/${activeCase.id}/report/clinician-review`, {
+    await runOperation('正在保存医生确认...', async () => {
+      const data = await requestJSON(`/api/cases/${activeCase.id}/report/clinician-review`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -144,27 +166,38 @@ function App() {
           review_status: 'clinician_confirmed',
         }),
       });
-      setReport(await res.json());
+      setReport(data);
       setMessage('医生确认状态已保存。');
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   async function checkSafety() {
     if (!safetyText.trim()) return;
-    setBusy(true);
-    setMessage('');
-    try {
-      const res = await fetch(`${API_BASE}/api/safety/check`, {
+    await runOperation('正在检查安全边界...', async () => {
+      const data = await requestJSON('/api/safety/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: safetyText }),
       });
-      setSafetyResult(await res.json());
-    } finally {
-      setBusy(false);
-    }
+      setSafetyResult(data);
+    });
+  }
+
+  async function exportReport() {
+    if (!activeCase || !report) return;
+    await runOperation('正在导出 Markdown...', async () => {
+      const res = await fetch(`${API_BASE}/api/cases/${activeCase.id}/report/export.md`);
+      if (!res.ok) throw new Error('报告导出失败。');
+      const markdown = await res.text();
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `periop-assessment-${activeCase.id}.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage('Markdown report exported.');
+    });
   }
 
   return (
@@ -173,11 +206,15 @@ function App() {
         <div className="brand">
           <HeartPulse size={26} />
           <div>
-            <h1>麻醉围术期 Agent</h1>
-            <p>医生端本地原型</p>
+            <h1>Periop Anesthesia Agent</h1>
+            <p>Doctor-reviewed clinical AI template</p>
           </div>
         </div>
         <button className="primary" onClick={createCase} disabled={busy}>新建病例</button>
+        <button className="sample-button" onClick={loadSampleCase} disabled={busy}>
+          <PlayCircle size={17} />
+          Load sample case
+        </button>
         <div className="case-list">
           {cases.map((item) => (
             <button
@@ -189,13 +226,14 @@ function App() {
               <small>{item.status}</small>
             </button>
           ))}
+          {cases.length === 0 && <p className="sidebar-empty">No cases yet. Start with the sample.</p>}
         </div>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">第一阶段 MVP</p>
+            <p className="eyebrow">LOCAL CLINICAL AI AGENT TEMPLATE</p>
             <h2>{activeCase?.title || '请先创建病例'}</h2>
           </div>
           <div className="status-strip">
@@ -207,10 +245,12 @@ function App() {
 
         <div className="notice">
           <AlertTriangle size={18} />
-          本系统只生成麻醉医生复核用草案，不提供自动诊断、用药剂量或能否手术的最终决定。
+          Doctor-reviewed draft only. No autonomous diagnosis, dosing, emergency instructions, or surgery clearance.
         </div>
 
+        {busy && <div className="busy-bar">{operation || '处理中...'}</div>}
         {message && <div className="toast">{message}</div>}
+        {error && <div className="error-banner">{error}</div>}
 
         <div className="grid">
           <section className="panel">
@@ -250,6 +290,7 @@ function App() {
               <h3>抽取预览</h3>
             </div>
             <div className="doc-list">
+              {documents.length === 0 && <div className="empty-state">No documents yet. Load the sample case or add pre-op materials.</div>}
               {documents.map((doc) => (
                 <article key={doc.id} className="doc-card">
                   <div>
@@ -292,7 +333,7 @@ function App() {
           )}
         </section>
 
-        <ReportView report={report} setReport={setReport} onConfirm={confirmReport} busy={busy} />
+        <ReportView report={report} setReport={setReport} onConfirm={confirmReport} onExport={exportReport} busy={busy} />
       </section>
     </main>
   );
@@ -308,13 +349,13 @@ function Stat({ icon, label, value }) {
   );
 }
 
-function ReportView({ report, setReport, onConfirm, busy }) {
+function ReportView({ report, setReport, onConfirm, onExport, busy }) {
   if (!report) {
     return (
       <section className="panel empty-report">
         <Activity size={28} />
         <h3>等待生成评估草案</h3>
-        <p>上传或输入术前资料后，运行 Agent workflow 生成结构化报告。</p>
+        <p>Load the synthetic sample or add pre-op materials to generate a structured doctor-reviewed draft.</p>
       </section>
     );
   }
@@ -326,7 +367,13 @@ function ReportView({ report, setReport, onConfirm, busy }) {
           <p className="eyebrow">术前麻醉评估草案</p>
           <h3>需麻醉医生复核确认</h3>
         </div>
-        <button className="primary" onClick={onConfirm} disabled={busy}>保存医生确认</button>
+        <div className="report-actions">
+          <button className="secondary icon-button" onClick={onExport} disabled={busy}>
+            <Download size={17} />
+            Export Markdown
+          </button>
+          <button className="primary" onClick={onConfirm} disabled={busy}>保存医生确认</button>
+        </div>
       </div>
 
       <div className="report-grid">
