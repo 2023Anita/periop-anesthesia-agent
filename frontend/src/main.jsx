@@ -12,6 +12,8 @@ function App() {
   const [report, setReport] = useState(null);
   const [manualText, setManualText] = useState('');
   const [modality, setModality] = useState('clinical_note');
+  const [safetyText, setSafetyText] = useState('这个患者能不能手术？');
+  const [safetyResult, setSafetyResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -149,6 +151,22 @@ function App() {
     }
   }
 
+  async function checkSafety() {
+    if (!safetyText.trim()) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      const res = await fetch(`${API_BASE}/api/safety/check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: safetyText }),
+      });
+      setSafetyResult(await res.json());
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -248,6 +266,31 @@ function App() {
             </button>
           </section>
         </div>
+
+        <section className="panel safety-panel">
+          <div className="panel-title">
+            <AlertTriangle size={20} />
+            <h3>医疗安全边界检查</h3>
+          </div>
+          <div className="safety-check-row">
+            <textarea
+              value={safetyText}
+              onChange={(event) => setSafetyText(event.target.value)}
+              placeholder="试试：这个患者能不能手术？诱导药给多少剂量？"
+            />
+            <button className="secondary" onClick={checkSafety} disabled={busy || !safetyText.trim()}>
+              检查边界
+            </button>
+          </div>
+          {safetyResult && (
+            <div className={safetyResult.allowed ? 'safety-result allowed' : 'safety-result blocked'}>
+              <strong>{safetyResult.allowed ? '允许：医生辅助任务' : '拦截：超出安全边界'}</strong>
+              <span>{safetyResult.category}</span>
+              <p>{safetyResult.reason}</p>
+              <small>{safetyResult.safe_response}</small>
+            </div>
+          )}
+        </section>
 
         <ReportView report={report} setReport={setReport} onConfirm={confirmReport} busy={busy} />
       </section>

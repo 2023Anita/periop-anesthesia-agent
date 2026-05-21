@@ -60,3 +60,11 @@ cd "backend"
 pytest
 ```
 
+## 本地评测集
+
+```bash
+cd "backend"
+python -m app.evals.run_local
+```
+
+评测覆盖术前评估病例、心电图/化验异常、资料缺失和医疗越界请求。

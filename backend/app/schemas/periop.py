@@ -124,3 +124,15 @@ class PreopAssessmentReport(BaseModel):
 class ClinicianReviewUpdate(BaseModel):
     clinician_notes: str = ""
     review_status: ReviewStatus = ReviewStatus.clinician_confirmed
+
+
+class SafetyCheckRequest(BaseModel):
+    text: str = Field(min_length=1)
+
+
+class SafetyCheckResponse(BaseModel):
+    allowed: bool
+    category: str
+    reason: str
+    safe_response: str
+    matched_terms: list[str] = Field(default_factory=list)

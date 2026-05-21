@@ -94,22 +94,9 @@ def _build_deterministic_report(case_id: str, documents: list[DocumentRecord]) -
 
 async def _try_agents_sdk_refinement(report: PreopAssessmentReport) -> PreopAssessmentReport:
     try:
-        from agents import Agent, Runner
+        from app.agents.sdk_workflow import refine_report_with_agents_sdk
 
-        agent = Agent(
-            name="麻醉术前评估报告质控助手",
-            instructions=(
-                "你是麻醉医生辅助系统的质控助手。只能改进报告表达和缺失项完整性，"
-                "不得给药物剂量、不得决定能否手术、不得替代医生诊断。"
-            ),
-            output_type=PreopAssessmentReport,
-        )
-        result = await Runner.run(
-            agent,
-            "请在不改变安全边界的前提下，复核并结构化这份术前麻醉评估草案：\n"
-            + report.model_dump_json(),
-        )
-        return result.final_output
+        return await refine_report_with_agents_sdk(report)
     except Exception:
         return report
 

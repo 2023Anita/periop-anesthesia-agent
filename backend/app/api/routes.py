@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
+from app.agents.safety import check_medical_safety
 from app.agents.workflow import run_preop_assessment
 from app.core import store
 from app.schemas.periop import (
@@ -11,6 +12,8 @@ from app.schemas.periop import (
     DocumentModality,
     DocumentRecord,
     PreopAssessmentReport,
+    SafetyCheckRequest,
+    SafetyCheckResponse,
     TextDocumentCreate,
 )
 from app.tools.document_extractors import extract_document_text
@@ -106,3 +109,7 @@ def update_review(case_id: str, payload: ClinicianReviewUpdate) -> PreopAssessme
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+
+@router.post("/safety/check", response_model=SafetyCheckResponse)
+def safety_check(payload: SafetyCheckRequest) -> SafetyCheckResponse:
+    return check_medical_safety(payload.text)

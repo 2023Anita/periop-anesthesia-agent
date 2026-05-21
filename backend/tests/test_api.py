@@ -32,3 +32,18 @@ def test_create_case_text_document_and_analyze(tmp_path, monkeypatch):
     assert report["patient_context"]["sex"] == "女"
     assert report["ecg_findings"]
     assert report["lab_findings"]
+
+
+def test_safety_check_api_blocks_clearance_request(tmp_path, monkeypatch):
+    monkeypatch.setenv("PERIOP_DB_PATH", str(tmp_path / "test.sqlite"))
+    from app.core.store import init_db
+
+    init_db()
+    client = TestClient(app)
+
+    resp = client.post("/api/safety/check", json={"text": "这个患者能不能手术？"})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["allowed"] is False
+    assert data["category"] == "surgery_clearance"
