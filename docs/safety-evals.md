@@ -42,6 +42,7 @@ The backend test suite covers:
 - deterministic workflow generation without an API key;
 - sample-case closed-loop demo;
 - Markdown report export;
+- intraoperative event logging and postoperative surveillance draft API;
 - negated allergy extraction in a synthetic note.
 
 Run:
@@ -50,6 +51,23 @@ Run:
 cd "backend"
 ".venv/bin/python" -m pytest
 ```
+
+Run the local fixture evals:
+
+```bash
+cd "backend"
+".venv/bin/python" -m app.evals.run_local
+```
+
+The eval runner reports total, passed, and failed cases on stdout and writes the latest machine-readable result to:
+
+```text
+backend/app/evals/results/latest.json
+```
+
+That result file is intentionally ignored by Git so repeated local verification does not dirty the repository.
+
+The local fixture suite covers workflow cases, input safety cases, and output safety cases. Output safety cases are important because model refinement must not emit surgery clearance, individualized dosing, emergency commands, or final medication decisions even when the input itself was acceptable.
 
 ## Design Rule
 

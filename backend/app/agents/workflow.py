@@ -89,6 +89,11 @@ def _build_deterministic_report(case_id: str, documents: list[DocumentRecord]) -
             "术后根据术前风险和术中事件决定 PACU/病房监测重点。",
         ],
         safety_notice=SAFETY_NOTICE,
+        postop_surveillance_plan=[
+            "PACU 交接时复核术前高风险线索、术中事件、气道情况、镇痛/恶心呕吐风险和出血风险。",
+            "存在心电图、贫血、肾功能或电解质异常线索时，由医生决定术后复查项目和监测级别。",
+            "出现持续低氧、低血压、胸痛、意识改变、活动性出血或新发心律失常时，需临床团队及时评估。",
+        ],
     )
 
 

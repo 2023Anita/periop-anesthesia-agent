@@ -1,0 +1,30 @@
+# Copy this file to agent_config.yaml and fill values from the Band dashboard.
+# Do not commit the real file. Each external agent has its own Band agent UUID
+# and API key.
+
+periop_intake_agent:
+  name: "Periop Intake Agent"
+  mention: "@Periop Intake Agent"
+  agent_id: "<band-agent-uuid>"
+  api_key: "<band-agent-api-key>"
+
+ecg_lab_risk_agent:
+  name: "ECG Lab Risk Agent"
+  mention: "@ECG Lab Risk Agent"
+  agent_id: "<band-agent-uuid>"
+  api_key: "<band-agent-api-key>"
+
+periop_safety_reviewer:
+  name: "Periop Safety Reviewer"
+  mention: "@Periop Safety Reviewer"
+  agent_id: "<band-agent-uuid>"
+  api_key: "<band-agent-api-key>"
+
+postop_surveillance_agent:
+  name: "Postop Surveillance Agent"
+  mention: "@Postop Surveillance Agent"
+  agent_id: "<band-agent-uuid>"
+  api_key: "<band-agent-api-key>"
+
+demo_room:
+  chat_id: "<band-chat-room-id>"

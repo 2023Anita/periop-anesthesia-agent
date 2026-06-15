@@ -1,23 +1,35 @@
 from __future__ import annotations
 
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse
 
-from app.agents.safety import check_medical_safety
+from app.agents.band_collaboration import (
+    build_band_collaboration_trace,
+    is_band_configured,
+    render_band_transcript_markdown,
+)
+from app.agents.safety import BLOCKED_PATTERNS, check_medical_safety
 from app.agents.workflow import run_preop_assessment
 from app.core import store
 from app.schemas.periop import (
     CaseCreate,
     CaseSummary,
+    BandCollaborationResponse,
     ClinicianReviewUpdate,
     DemoCaseResponse,
     DocumentModality,
     DocumentRecord,
+    IntraopEventCreate,
+    IntraopEventRecord,
+    PostopPlanResponse,
     PreopAssessmentReport,
     SafetyCheckRequest,
     SafetyCheckResponse,
+    SystemStatusResponse,
     TextDocumentCreate,
 )
 from app.tools.document_extractors import extract_document_text
@@ -27,6 +39,24 @@ from app.tools.report_export import render_report_markdown
 router = APIRouter()
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SAMPLE_CASE_PATH = PROJECT_ROOT / "data" / "samples" / "sample-preop-ecg.txt"
+EVAL_CASES_PATH = PROJECT_ROOT / "backend" / "app" / "evals" / "cases.jsonl"
+
+
+def _count_eval_cases() -> int:
+    if not EVAL_CASES_PATH.exists():
+        return 0
+    return sum(1 for line in EVAL_CASES_PATH.read_text(encoding="utf-8").splitlines() if line.strip())
+
+
+@router.get("/system/status", response_model=SystemStatusResponse)
+def get_system_status() -> SystemStatusResponse:
+    return SystemStatusResponse(
+        deterministic_workflow_available=True,
+        agents_sdk_refinement_configured=bool(os.getenv("OPENAI_API_KEY")),
+        band_collaboration_configured=is_band_configured(),
+        eval_case_count=_count_eval_cases(),
+        safety_boundary_categories=sorted(BLOCKED_PATTERNS),
+    )
 
 
 @router.get("/cases", response_model=list[CaseSummary])
@@ -150,6 +180,125 @@ def update_review(case_id: str, payload: ClinicianReviewUpdate) -> PreopAssessme
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.get("/cases/{case_id}/intraop-events", response_model=list[IntraopEventRecord])
+def list_intraop_events(case_id: str) -> list[IntraopEventRecord]:
+    try:
+        return store.list_intraop_events(case_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/cases/{case_id}/intraop-events", response_model=IntraopEventRecord)
+def add_intraop_event(case_id: str, payload: IntraopEventCreate) -> IntraopEventRecord:
+    try:
+        return store.add_intraop_event(case_id, payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/cases/{case_id}/postop-plan", response_model=PostopPlanResponse)
+def build_postop_plan(case_id: str) -> PostopPlanResponse:
+    try:
+        report = store.get_report(case_id)
+        events = store.list_intraop_events(case_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _build_postop_plan(case_id, report, events)
+
+
+@router.post("/cases/{case_id}/band-collaboration", response_model=BandCollaborationResponse)
+async def create_band_collaboration_trace(case_id: str, send_to_band: bool = False) -> BandCollaborationResponse:
+    try:
+        documents = store.list_documents(case_id)
+        report = store.get_report(case_id)
+        events = store.list_intraop_events(case_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    try:
+        return await build_band_collaboration_trace(
+            case_id=case_id,
+            documents=documents,
+            report=report,
+            events=events,
+            send_to_band=send_to_band,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Band collaboration failed: {exc}") from exc
+
+
+@router.get("/cases/{case_id}/band-collaboration/export.md", response_class=PlainTextResponse)
+async def export_band_collaboration_markdown(case_id: str) -> PlainTextResponse:
+    try:
+        documents = store.list_documents(case_id)
+        report = store.get_report(case_id)
+        events = store.list_intraop_events(case_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    trace = await build_band_collaboration_trace(
+        case_id=case_id,
+        documents=documents,
+        report=report,
+        events=events,
+        send_to_band=False,
+    )
+    filename = f"band-collaboration-{case_id}.md"
+    return PlainTextResponse(
+        render_band_transcript_markdown(trace),
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post("/safety/check", response_model=SafetyCheckResponse)
 def safety_check(payload: SafetyCheckRequest) -> SafetyCheckResponse:
     return check_medical_safety(payload.text)
+
+
+def _build_postop_plan(
+    case_id: str,
+    report: PreopAssessmentReport,
+    events: list[IntraopEventRecord],
+) -> PostopPlanResponse:
+    surveillance_focus = [
+        "PACU 内持续复核生命体征、疼痛、恶心呕吐、出血和意识状态。",
+        *report.perioperative_monitoring_focus,
+    ]
+    suggested_checks = list(report.suggested_additional_checks)
+    escalation_triggers = [
+        "持续低氧、低血压、胸痛、意识改变、活动性出血或新发神经系统异常时，需立即由临床团队评估。",
+    ]
+
+    for flag in report.risk_flags:
+        if flag.severity in {"high", "critical"}:
+            surveillance_focus.append(f"围绕高风险线索复核：{flag.name}。")
+
+    for event in events:
+        if event.event_type.value in {"hypotension", "hypertension", "arrhythmia"}:
+            suggested_checks.append("术中血流动力学或心律事件后，由医生判断是否复查心电图、电解质、血红蛋白或心肌损伤标志物。")
+        if event.event_type.value == "hypoxemia":
+            suggested_checks.append("术中低氧事件后，关注呼吸频率、SpO2、气道状态，必要时由医生判断是否需血气或胸部影像。")
+        if event.event_type.value == "bleeding":
+            suggested_checks.append("术中出血事件后，关注出血量、血红蛋白、凝血和容量状态。")
+        if event.severity in {"high", "critical"}:
+            escalation_triggers.append(f"术中记录了 {event.severity} 级事件：{event.description}，术后交接需明确复核。")
+
+    return PostopPlanResponse(
+        case_id=case_id,
+        generated_at=datetime.now(timezone.utc),
+        surveillance_focus=_dedupe(surveillance_focus),
+        suggested_checks=_dedupe(suggested_checks),
+        escalation_triggers=_dedupe(escalation_triggers),
+        safety_notice=(
+            "本术后计划为医生端交接和复核清单，不能替代术后医嘱、处方、抢救流程或病区处置决定。"
+        ),
+    )
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for item in items:
+        if item and item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from agents import Agent, GuardrailFunctionOutput, Runner, RunConfig, RunContextWrapper, TResponseInputItem, input_guardrail, trace
 
-from app.agents.safety import check_medical_safety
+from app.agents.safety import check_medical_safety, check_report_output_safety
 from app.schemas.periop import PreopAssessmentReport, SafetyCheckResponse
 
 
@@ -34,6 +34,18 @@ def build_preop_orchestrator() -> Agent:
         name="Preop Risk Agent",
         instructions="只负责术前麻醉风险草案、追问问题和补充检查建议；最终必须由麻醉医生确认。",
     )
+    intraop_event_agent = Agent(
+        name="Intraop Event Agent",
+        instructions="只负责将术中事件整理为交接线索和复核重点；不得输出抢救流程、处置命令或用药剂量。",
+    )
+    postop_plan_agent = Agent(
+        name="Postop Plan Agent",
+        instructions="只负责生成医生端术后监测和复查清单草案；不得替代术后医嘱或面向患者给建议。",
+    )
+    safety_reviewer_agent = Agent(
+        name="Safety Reviewer Agent",
+        instructions="只负责检查输出是否越过医生辅助边界；发现手术许可、剂量、抢救指令或患者直接建议时必须要求回退。",
+    )
 
     return Agent(
         name="Perioperative Anesthesia Orchestrator",
@@ -61,6 +73,18 @@ def build_preop_orchestrator() -> Agent:
                 tool_name="preop_risk_review",
                 tool_description="复核术前麻醉风险草案、追问问题和补充检查建议。",
             ),
+            intraop_event_agent.as_tool(
+                tool_name="intraop_event_review",
+                tool_description="整理术中事件对交接和术后复核的影响。",
+            ),
+            postop_plan_agent.as_tool(
+                tool_name="postop_plan_review",
+                tool_description="复核医生端术后监测和复查清单草案。",
+            ),
+            safety_reviewer_agent.as_tool(
+                tool_name="safety_boundary_review",
+                tool_description="检查输出是否包含手术许可、药物剂量、抢救指令或患者直接建议。",
+            ),
         ],
         output_type=PreopAssessmentReport,
     )
@@ -75,4 +99,7 @@ async def refine_report_with_agents_sdk(report: PreopAssessmentReport) -> PreopA
             + report.model_dump_json(),
             run_config=RunConfig(workflow_name="periop_anesthesia_preop_assessment"),
         )
-    return result.final_output
+    refined_report = result.final_output
+    if not check_report_output_safety(refined_report).allowed:
+        return report
+    return refined_report

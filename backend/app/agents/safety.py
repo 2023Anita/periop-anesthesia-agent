@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import re
+
+from app.schemas.periop import PreopAssessmentReport
 from app.schemas.periop import SafetyCheckResponse
 
 
@@ -15,6 +18,13 @@ BLOCKED_PATTERNS = {
     "emergency_treatment": ["怎么抢救", "抢救流程", "立即处理", "休克怎么办", "心跳骤停", "插管怎么做"],
     "medication_decision": ["停药", "换药", "加药", "抗凝桥接", "是否停用", "要不要停"],
     "patient_direct_advice": ["我是患者", "我该怎么办", "我能不能", "我需不需要", "我要不要"],
+}
+
+OUTPUT_BLOCKED_PATTERNS = {
+    "surgery_clearance": ["可以手术", "不可以手术", "不能手术", "建议取消手术", "建议延期手术", "手术许可", "cleared for surgery"],
+    "drug_dose": ["丙泊酚", "依托咪酯", "咪达唑仑", "芬太尼", "罗库溴铵", "舒芬太尼"],
+    "emergency_treatment": ["立即抢救", "立即插管", "立即电除颤", "立刻给药"],
+    "medication_decision": ["应停用", "应换用", "应加用", "桥接抗凝方案"],
 }
 
 
@@ -39,6 +49,32 @@ def check_medical_safety(text: str) -> SafetyCheckResponse:
     )
 
 
+def check_report_output_safety(report: PreopAssessmentReport) -> SafetyCheckResponse:
+    return check_output_text_safety(report.model_dump_json())
+
+
+def check_output_text_safety(text: str) -> SafetyCheckResponse:
+    for category, terms in OUTPUT_BLOCKED_PATTERNS.items():
+        matched = [term for term in terms if term.lower() in text.lower()]
+        if matched:
+            if category == "drug_dose" and not _contains_dose_like_instruction(text):
+                continue
+            return SafetyCheckResponse(
+                allowed=False,
+                category=f"output_{category}",
+                reason=_reason_for(category),
+                safe_response=SAFE_RESPONSE,
+                matched_terms=matched,
+            )
+    return SafetyCheckResponse(
+        allowed=True,
+        category="output_allowed_support",
+        reason="输出未触发明确手术许可、药物剂量、抢救处置或停换药决策边界。",
+        safe_response="可以作为医生复核用草案继续展示。",
+        matched_terms=[],
+    )
+
+
 def _reason_for(category: str) -> str:
     reasons = {
         "surgery_clearance": "系统不能自动决定能否手术或替代术前麻醉评估结论。",
@@ -48,3 +84,18 @@ def _reason_for(category: str) -> str:
         "patient_direct_advice": "本系统定位为医生端辅助工具，不面向患者提供个体化诊疗建议。",
     }
     return reasons.get(category, "该请求超出医生辅助资料整理边界。")
+
+
+def _contains_dose_like_instruction(text: str) -> bool:
+    dose_patterns = [
+        r"\d+(\.\d+)?\s*mg",
+        r"\d+(\.\d+)?\s*毫克",
+        r"\d+(\.\d+)?\s*mg/kg",
+        r"\d+(\.\d+)?\s*(mcg|μg|ug)/kg",
+        r"\d+(\.\d+)?\s*(mcg|μg|ug)",
+        r"\d+(\.\d+)?\s*(ml|毫升|单位|u)\b",
+        r"(滴速|泵速)\s*\d+",
+        r"给\s*\d+",
+        r"用\s*\d+",
+    ]
+    return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in dose_patterns)

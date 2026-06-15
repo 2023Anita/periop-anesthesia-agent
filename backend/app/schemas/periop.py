@@ -22,6 +22,17 @@ class ReviewStatus(str, Enum):
     clinician_confirmed = "clinician_confirmed"
 
 
+class IntraopEventType(str, Enum):
+    hypotension = "hypotension"
+    hypertension = "hypertension"
+    hypoxemia = "hypoxemia"
+    arrhythmia = "arrhythmia"
+    bleeding = "bleeding"
+    airway = "airway"
+    medication = "medication"
+    other = "other"
+
+
 class CaseSummary(BaseModel):
     id: str
     title: str
@@ -78,6 +89,9 @@ class RiskFlag(BaseModel):
 
 class ECGFinding(BaseModel):
     source: str
+    analyzer_name: str = "rule_based_text_ecg_adapter"
+    adapter_version: str = "0.1.0"
+    confidence: Literal["low", "medium", "high"] = "medium"
     heart_rate: str | None = None
     rhythm: str | None = None
     pr_interval: str | None = None
@@ -119,6 +133,62 @@ class PreopAssessmentReport(BaseModel):
     safety_notice: str
     review_status: ReviewStatus = ReviewStatus.draft
     clinician_notes: str = ""
+    postop_surveillance_plan: list[str] = Field(default_factory=list)
+
+
+class IntraopEventCreate(BaseModel):
+    event_type: IntraopEventType = IntraopEventType.other
+    severity: Literal["low", "medium", "high", "critical"] = "medium"
+    description: str = Field(min_length=1, max_length=1000)
+    observed_at: datetime | None = None
+    clinician_action_summary: str = Field(default="", max_length=1000)
+
+
+class IntraopEventRecord(BaseModel):
+    id: str
+    case_id: str
+    event_type: IntraopEventType
+    severity: Literal["low", "medium", "high", "critical"]
+    description: str
+    observed_at: datetime
+    clinician_action_summary: str = ""
+    created_at: datetime
+
+
+class PostopPlanResponse(BaseModel):
+    case_id: str
+    generated_at: datetime
+    surveillance_focus: list[str] = Field(default_factory=list)
+    suggested_checks: list[str] = Field(default_factory=list)
+    escalation_triggers: list[str] = Field(default_factory=list)
+    safety_notice: str
+
+
+class BandAgentRole(BaseModel):
+    name: str
+    responsibility: str
+    band_mention: str
+
+
+class BandCollaborationStep(BaseModel):
+    order: int
+    from_agent: str
+    to_agent: str
+    handoff: str
+    shared_context: list[str] = Field(default_factory=list)
+    expected_output: str
+    status: Literal["planned", "sent_to_band", "local_trace"] = "planned"
+
+
+class BandCollaborationResponse(BaseModel):
+    case_id: str
+    generated_at: datetime
+    band_configured: bool
+    room_id: str | None = None
+    minimum_agent_requirement_met: bool
+    agent_roles: list[BandAgentRole]
+    collaboration_steps: list[BandCollaborationStep]
+    audit_notes: list[str] = Field(default_factory=list)
 
 
 class ClinicianReviewUpdate(BaseModel):
@@ -136,6 +206,14 @@ class SafetyCheckResponse(BaseModel):
     reason: str
     safe_response: str
     matched_terms: list[str] = Field(default_factory=list)
+
+
+class SystemStatusResponse(BaseModel):
+    deterministic_workflow_available: bool
+    agents_sdk_refinement_configured: bool
+    band_collaboration_configured: bool = False
+    eval_case_count: int
+    safety_boundary_categories: list[str] = Field(default_factory=list)
 
 
 class DemoCaseResponse(BaseModel):
