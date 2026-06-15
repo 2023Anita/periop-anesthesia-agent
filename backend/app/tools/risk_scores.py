@@ -8,12 +8,12 @@ from app.schemas.periop import DocumentFinding, PatientContext, RiskFlag
 HISTORY_TERMS = {
     "高血压": ["高血压", "hypertension"],
     "糖尿病": ["糖尿病", "diabetes", "dm"],
-    "冠心病": ["冠心病", "心肌梗死", "心绞痛", "cad", "mi"],
+    "冠心病": ["冠心病", "心肌梗死", "心绞痛", "cad", "mi", "coronary artery disease"],
     "心衰": ["心衰", "心功能不全", "heart failure"],
-    "COPD/哮喘": ["copd", "慢阻肺", "哮喘"],
-    "肾功能异常": ["肾功能不全", "肌酐升高", "ckd", "尿毒症"],
+    "COPD/哮喘": ["copd", "慢阻肺", "哮喘", "asthma"],
+    "肾功能异常": ["肾功能不全", "肌酐升高", "ckd", "尿毒症", "renal dysfunction", "kidney disease"],
     "脑卒中": ["脑卒中", "脑梗", "脑出血", "stroke"],
-    "睡眠呼吸暂停风险": ["睡眠呼吸暂停", "OSA", "打鼾", "鼾症"],
+    "睡眠呼吸暂停风险": ["睡眠呼吸暂停", "OSA", "打鼾", "鼾症", "sleep apnea", "snoring"],
 }
 
 MEDICATION_TERMS = [
@@ -25,6 +25,14 @@ MEDICATION_TERMS = [
     "阿哌沙班",
     "达比加群",
     "低分子肝素",
+    "aspirin",
+    "clopidogrel",
+    "warfarin",
+    "rivaroxaban",
+    "apixaban",
+    "dabigatran",
+    "insulin",
+    "metformin",
     "胰岛素",
     "二甲双胍",
     "GLP-1",
@@ -34,12 +42,20 @@ MEDICATION_TERMS = [
     "ACEI",
     "ARB",
 ]
-ALLERGY_TERMS = ["过敏", "青霉素", "头孢", "碘", "乳胶"]
+ALLERGY_TERMS = ["过敏", "青霉素", "头孢", "碘", "乳胶", "penicillin", "cephalosporin", "iodine", "latex"]
 
 
 def build_patient_context(all_text: str) -> PatientContext:
     context = PatientContext()
-    context.age = _extract_first(all_text, [r"(\d{1,3})\s*岁", r"年龄[:：]?\s*(\d{1,3})"])
+    context.age = _extract_first(
+        all_text,
+        [
+            r"(\d{1,3})\s*岁",
+            r"年龄[:：]?\s*(\d{1,3})",
+            r"(\d{1,3})\s*years?\s*old",
+            r"age[:：]?\s*(\d{1,3})",
+        ],
+    )
     context.sex = _extract_sex(all_text)
     context.planned_surgery = _extract_first(
         all_text,
@@ -47,6 +63,9 @@ def build_patient_context(all_text: str) -> PatientContext:
             r"拟行[:：]?\s*([^。\n；;]{2,40}?(?:术|手术))",
             r"拟行手术[:：]?\s*([^。\n；;]{2,40})",
             r"手术名称[:：]?\s*([^。\n；;]{2,40})",
+            r"planned for\s+([^.\n;]{2,80})",
+            r"planned surgery[:：]?\s*([^.\n;]{2,80})",
+            r"procedure[:：]?\s*([^.\n;]{2,80})",
         ],
     )
     context.height_weight_bmi = _extract_body_size(all_text)
@@ -63,6 +82,10 @@ def build_patient_context(all_text: str) -> PatientContext:
         context.urgency = "急诊"
     elif "择期" in all_text:
         context.urgency = "择期"
+    elif re.search(r"\bemergency\b|urgent", all_text, flags=re.IGNORECASE):
+        context.urgency = "Emergency"
+    elif re.search(r"\belective\b", all_text, flags=re.IGNORECASE):
+        context.urgency = "Elective"
     for term in ["全麻异常", "困难插管", "困难气道", "恶性高热", "PONV", "术后恶心呕吐"]:
         if term.lower() in all_text.lower():
             context.anesthesia_history.append(term)
@@ -104,7 +127,7 @@ def build_risk_flags(context: PatientContext, all_text: str) -> list[RiskFlag]:
                 evidence=context.history,
             )
         )
-    if any(med in context.medications for med in ["阿司匹林", "氯吡格雷", "华法林", "利伐沙班", "达比加群"]):
+    if any(med in context.medications for med in ["阿司匹林", "氯吡格雷", "华法林", "利伐沙班", "达比加群", "aspirin", "clopidogrel", "warfarin", "rivaroxaban", "dabigatran"]):
         flags.append(
             RiskFlag(
                 name="抗栓/出血风险",
@@ -122,7 +145,7 @@ def build_risk_flags(context: PatientContext, all_text: str) -> list[RiskFlag]:
                 evidence=context.medications,
             )
         )
-    if any(word in all_text for word in ["困难气道", "张口受限", "颈椎活动受限", "Mallampati III", "Mallampati IV"]):
+    if any(word.lower() in all_text.lower() for word in ["困难气道", "张口受限", "颈椎活动受限", "Mallampati III", "Mallampati IV", "difficult airway", "limited mouth opening"]):
         flags.append(
             RiskFlag(
                 name="困难气道风险",
@@ -179,7 +202,7 @@ def _extract_first(text: str, patterns: list[str]) -> str | None:
 def _contains_unnegated_term(text: str, term: str) -> bool:
     for match in re.finditer(re.escape(term), text, flags=re.IGNORECASE):
         prefix = text[max(0, match.start() - 8) : match.start()]
-        if not any(negation in prefix for negation in ["否认", "无", "未见", "没有", "无明确"]):
+        if not any(negation in prefix.lower() for negation in ["否认", "无", "未见", "没有", "无明确", "denies", "no ", "no known", "without"]):
             return True
     return False
 
@@ -189,6 +212,10 @@ def _extract_sex(text: str) -> str | None:
         return "男"
     if re.search(r"(患者)?\s*女|女性|性别[:：]?\s*女", text):
         return "女"
+    if re.search(r"\bmale\b|sex[:：]?\s*male", text, flags=re.IGNORECASE):
+        return "Male"
+    if re.search(r"\bfemale\b|sex[:：]?\s*female", text, flags=re.IGNORECASE):
+        return "Female"
     return None
 
 

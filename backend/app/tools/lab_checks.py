@@ -21,7 +21,7 @@ LAB_PATTERNS = {
         "relevance": "血小板异常会影响出血风险和椎管内麻醉安全性评估。",
     },
     "Cr": {
-        "patterns": [r"\bCr[:：]?\s*([0-9.]+)\s*(umol/L|μmol/L)?", r"肌酐[:：]?\s*([0-9.]+)\s*(umol/L|μmol/L)?"],
+        "patterns": [r"\bCr[:：]?\s*([0-9.]+)\s*(umol/L|μmol/L)?", r"肌酐[:：]?\s*([0-9.]+)\s*(umol/L|μmol/L)?", r"creatinine[:：]?\s*([0-9.]+)\s*(umol/L|μmol/L)?"],
         "unit": "umol/L",
         "low": None,
         "high": 110,

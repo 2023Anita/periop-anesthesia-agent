@@ -92,6 +92,18 @@ Then open `http://127.0.0.1:5173`, click **Load sample case**, review the draft,
 
 The script starts the backend on `8010` and the frontend on `5173`. Press `Ctrl+C` in the script terminal to stop both.
 
+## Free Public Demo
+
+The repository includes a GitHub Pages static demo mode for hackathon review:
+
+```text
+https://2023anita.github.io/periop-anesthesia-agent/
+```
+
+The public demo uses synthetic data only and runs without backend credentials. It preserves the core reviewer flow: load a sample case, inspect ECG/lab risk clues, review safety boundaries, add intraoperative events, generate a postoperative surveillance draft, and view the Band-ready collaboration trace.
+
+For a full backend deployment, the root `Dockerfile` builds the React app and serves it from FastAPI. It can be used on free/low-cost Docker-capable hosts such as Render or Hugging Face Spaces.
+
 ## 3-Minute Manual Quickstart
 
 ```bash

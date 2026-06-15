@@ -16,7 +16,7 @@ def analyze_ecg_text(source: str, text: str) -> ECGFinding | None:
 
     finding = ECGFinding(
         source=source,
-        heart_rate=_extract_value(normalized, [r"心率[:：]?\s*(\d+\s*次/分)", r"HR[:：]?\s*(\d+)"]),
+        heart_rate=_extract_value(normalized, [r"心率[:：]?\s*(\d+\s*次/分)", r"HR[:：]?\s*(\d+\s*bpm|\d+)", r"heart rate[:：]?\s*(\d+\s*bpm|\d+)"]),
         rhythm=_extract_rhythm(normalized),
         pr_interval=_extract_value(normalized, [r"PR[:：]?\s*([0-9.]+\s*ms)", r"PR间期[:：]?\s*([0-9.]+\s*ms)"]),
         qrs_duration=_extract_value(normalized, [r"QRS[:：]?\s*([0-9.]+\s*ms)", r"QRS时限[:：]?\s*([0-9.]+\s*ms)"]),
@@ -25,7 +25,7 @@ def analyze_ecg_text(source: str, text: str) -> ECGFinding | None:
 
     finding.st_t_changes = _collect_terms(
         normalized,
-        ["ST-T改变", "ST段压低", "ST段抬高", "T波倒置", "T波低平", "异常Q波", "缺血"],
+        ["ST-T改变", "ST段压低", "ST段抬高", "T波倒置", "T波低平", "异常Q波", "缺血", "ST-T changes", "ST depression", "ST elevation", "T-wave inversion", "ischemia"],
     )
     finding.conduction_findings = _collect_terms(
         normalized,
@@ -38,11 +38,14 @@ def analyze_ecg_text(source: str, text: str) -> ECGFinding | None:
             "三度房室传导阻滞",
             "完全性右束支传导阻滞",
             "完全性左束支传导阻滞",
+            "right bundle branch block",
+            "left bundle branch block",
+            "AV block",
         ],
     )
     finding.arrhythmia_findings = _collect_terms(
         normalized,
-        ["房颤", "心房颤动", "房扑", "室性早搏", "频发室早", "房性早搏", "室上速", "心动过缓", "心动过速", "起搏心律"],
+        ["房颤", "心房颤动", "房扑", "室性早搏", "频发室早", "房性早搏", "室上速", "心动过缓", "心动过速", "起搏心律", "atrial fibrillation", "atrial flutter", "PVC", "bradycardia", "tachycardia", "paced rhythm"],
     )
     finding.anesthesia_risk_notes = _ecg_risk_notes(finding, normalized)
     finding.missing_info = _missing_ecg_info(finding)
@@ -50,7 +53,7 @@ def analyze_ecg_text(source: str, text: str) -> ECGFinding | None:
 
 
 def _looks_like_ecg(text: str) -> bool:
-    keywords = ["心电图", "ecg", "ekg", "窦性", "st-t", "qtc", "qrs", "房颤", "传导阻滞", "室性早搏", "心动过缓"]
+    keywords = ["心电图", "ecg", "ekg", "窦性", "sinus", "st-t", "qtc", "qrs", "房颤", "atrial fibrillation", "传导阻滞", "bundle branch block", "室性早搏", "心动过缓", "bradycardia"]
     return any(keyword in text for keyword in keywords)
 
 
@@ -63,8 +66,8 @@ def _extract_value(text: str, patterns: list[str]) -> str | None:
 
 
 def _extract_rhythm(text: str) -> str | None:
-    for term in ["窦性心律", "心房颤动", "房颤", "心房扑动", "房扑", "起搏心律"]:
-        if term in text:
+    for term in ["窦性心律", "心房颤动", "房颤", "心房扑动", "房扑", "起搏心律", "sinus rhythm", "atrial fibrillation", "atrial flutter", "paced rhythm"]:
+        if term.lower() in text.lower():
             return term
     return None
 
