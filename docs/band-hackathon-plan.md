@@ -51,12 +51,23 @@ POST /api/cases/{case_id}/band-collaboration
 GET /api/cases/{case_id}/band-collaboration/export.md
 ```
 
-Without Band credentials, this endpoint returns a local collaboration trace for demo and testing. With these environment variables configured, the backend sends handoff messages to the configured Band chat room:
+Without Band credentials, this endpoint returns a local Band-room transcript for demo and testing. The local adapter uses the same directed `@mention` message envelopes as the live adapter, including sender/receiver keys, shared context, handoff task, expected output, and message receipts.
+
+With these environment variables configured, the backend sends handoff messages to the configured Band chat room:
 
 ```bash
 BAND_API_BASE=https://app.band.ai/api/v1
 BAND_AGENT_API_KEY=...
 BAND_CHAT_ID=...
+```
+
+For a stronger proof of agent-to-agent collaboration, provide per-agent sender keys:
+
+```bash
+BAND_PERIOP_INTAKE_AGENT_API_KEY=...
+BAND_ECG_LAB_RISK_AGENT_API_KEY=...
+BAND_PERIOP_SAFETY_REVIEWER_API_KEY=...
+BAND_POSTOP_SURVEILLANCE_AGENT_API_KEY=...
 ```
 
 The repository includes `band-agent-config.example.yaml` as the required external-agent registration checklist. Copy it to `agent_config.yaml`, fill the four Band agent UUIDs and API keys, and keep the real file out of Git.
@@ -67,7 +78,7 @@ Live verification:
 ./scripts/check-band-live.sh
 ```
 
-The script checks that four external-agent entries exist, verifies required environment variables, creates a synthetic case, and sends the Band collaboration trace to the configured chat room.
+The script checks that four external-agent entries exist, verifies required environment variables, creates a synthetic case, and sends the Band collaboration transcript to the configured chat room.
 
 ## Demo Story
 
@@ -138,12 +149,12 @@ Periop Band shows what enterprise multi-agent collaboration can look like in hig
 ./scripts/verify-local.sh
 ```
 
-## Remaining Before Final Submission
+## Live Band Demo Checklist
 
 - Register the four external agents in Band.
 - Create a Band chat room for the demo.
 - Add the registered agents as participants.
 - Copy `band-agent-config.example.yaml` to `agent_config.yaml` and fill the four agent credentials locally.
-- Set `BAND_AGENT_API_KEY` and `BAND_CHAT_ID` locally or in the demo environment.
-- Run the Band collaboration trace against the real room.
-- Record the video with the Band room visible enough to prove collaboration.
+- Set `BAND_CHAT_ID` and either one demo `BAND_AGENT_API_KEY` or the four per-agent API keys locally.
+- Run `./scripts/check-band-live.sh` and confirm `adapter_mode` is `live`.
+- Record the video with the Band room visible enough to prove directed agent handoffs.

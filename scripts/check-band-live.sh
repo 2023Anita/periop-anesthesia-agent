@@ -4,8 +4,18 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 missing=()
-[[ -n "${BAND_AGENT_API_KEY:-}" ]] || missing+=("BAND_AGENT_API_KEY")
 [[ -n "${BAND_CHAT_ID:-}" ]] || missing+=("BAND_CHAT_ID")
+
+if [[ -z "${BAND_AGENT_API_KEY:-}" ]]; then
+  for key in \
+    BAND_PERIOP_INTAKE_AGENT_API_KEY \
+    BAND_ECG_LAB_RISK_AGENT_API_KEY \
+    BAND_PERIOP_SAFETY_REVIEWER_API_KEY \
+    BAND_POSTOP_SURVEILLANCE_AGENT_API_KEY
+  do
+    [[ -n "${!key:-}" ]] || missing+=("$key")
+  done
+fi
 
 agent_config="$ROOT_DIR/agent_config.yaml"
 if [[ ! -f "$agent_config" ]]; then
@@ -14,7 +24,7 @@ fi
 
 if (( ${#missing[@]} > 0 )); then
   printf 'Missing required Band environment variables: %s\n' "${missing[*]}" >&2
-  printf 'Create the four external agents and a chat room in Band, copy band-agent-config.example.yaml to agent_config.yaml, then export the values before running this script.\n' >&2
+  printf 'Create the four external agents and a chat room in Band, copy band-agent-config.example.yaml to agent_config.yaml, then export either BAND_AGENT_API_KEY or the four per-agent API keys before running this script.\n' >&2
   exit 2
 fi
 

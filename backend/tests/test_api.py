@@ -177,7 +177,11 @@ def test_band_collaboration_trace_meets_minimum_agent_requirement(tmp_path, monk
     assert data["minimum_agent_requirement_met"] is True
     assert len(data["agent_roles"]) >= 3
     assert len(data["collaboration_steps"]) >= 3
+    assert data["adapter_mode"] == "local"
+    assert len(data["message_receipts"]) == len(data["collaboration_steps"])
     assert all(step["status"] == "local_trace" for step in data["collaboration_steps"])
+    assert all(step["directed_message"].startswith(step["to_agent"]) for step in data["collaboration_steps"])
+    assert all(receipt["delivered"] is True for receipt in data["message_receipts"])
     assert any("@Periop Safety Reviewer" in step["to_agent"] for step in data["collaboration_steps"])
 
 
@@ -203,3 +207,5 @@ def test_band_collaboration_markdown_export_contains_agent_handoffs(tmp_path, mo
     assert "@Periop Safety Reviewer" in resp.text
     assert "@Postop Surveillance Agent" in resp.text
     assert "Minimum 3-agent requirement met: `True`" in resp.text
+    assert "## Message Receipts" in resp.text
+    assert "Adapter mode: `local`" in resp.text

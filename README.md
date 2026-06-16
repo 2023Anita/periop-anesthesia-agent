@@ -147,7 +147,16 @@ export BAND_AGENT_API_KEY="your-band-agent-api-key"
 export BAND_CHAT_ID="your-band-chat-room-id"
 ```
 
-Without Band credentials, the app still generates a local collaboration trace that shows the required agent roles and handoffs. With credentials, the backend can send the handoff messages to the configured Band chat room.
+For a stronger live demo, use separate Band Agent API keys for the sender roles:
+
+```bash
+export BAND_PERIOP_INTAKE_AGENT_API_KEY="..."
+export BAND_ECG_LAB_RISK_AGENT_API_KEY="..."
+export BAND_PERIOP_SAFETY_REVIEWER_API_KEY="..."
+export BAND_POSTOP_SURVEILLANCE_AGENT_API_KEY="..."
+```
+
+Without Band credentials, the app still generates a local Band-room transcript with directed `@mention` handoff messages, sender/receiver keys, adapter mode, and message receipts. With credentials, the backend posts the same directed handoff envelopes to the configured Band chat room through the Agent API.
 
 For the live hackathon demo, copy `band-agent-config.example.yaml` to `agent_config.yaml` and fill the four external Band agent credentials locally. `agent_config.yaml` is intentionally ignored by Git.
 
@@ -157,7 +166,7 @@ Live Band verification:
 ./scripts/check-band-live.sh
 ```
 
-The script exits with a clear missing-variable message until `BAND_AGENT_API_KEY` and `BAND_CHAT_ID` are configured.
+The script exits with a clear missing-variable message until `BAND_CHAT_ID` and either `BAND_AGENT_API_KEY` or the four per-agent API keys are configured.
 
 ## Architecture
 
@@ -178,22 +187,23 @@ flowchart LR
   I --> K["Clinician notes and Markdown export"]
   K --> L["Intra-op event log"]
   L --> M["Post-op surveillance draft"]
-  M --> N["Band-ready collaboration trace"]
-  N --> O["4 specialized agents with explicit handoffs"]
+  M --> N["Band collaboration adapter"]
+  N --> O["Directed @mention handoffs"]
+  O --> P["Local/live message receipts"]
 ```
 
 The OpenAI Agents SDK layer is intentionally a refinement layer. The baseline workflow remains deterministic and testable so the demo can run locally without network calls.
 
 ## Band of Agents Hackathon Fit
 
-This project targets the hackathon's regulated and high-stakes workflow track. The Band-ready workflow defines four collaborating agents:
+This project targets the hackathon's regulated and high-stakes workflow track. The Band collaboration adapter defines four collaborating agents:
 
 - `@Periop Intake Agent`
 - `@ECG Lab Risk Agent`
 - `@Periop Safety Reviewer`
 - `@Postop Surveillance Agent`
 
-The collaboration trace demonstrates shared context, handoffs, safety review, and clinician-facing postoperative planning. See [Band hackathon plan](docs/band-hackathon-plan.md) for the submission positioning, demo script, and verification checklist.
+The collaboration trace demonstrates shared context, directed `@mention` handoffs, safety review, clinician-facing postoperative planning, and message receipts for local or live Band runs. See [Band hackathon plan](docs/band-hackathon-plan.md) for the submission positioning, demo script, and verification checklist.
 
 ## Safety Boundary
 

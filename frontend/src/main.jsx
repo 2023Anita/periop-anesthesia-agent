@@ -836,7 +836,7 @@ function BandCollaborationPanel({ trace, onGenerate, onExport, disabled, t }) {
       {trace && (
         <>
           <div className="band-summary">
-            <span>{trace.band_configured ? label(t, 'bandConfigured') : label(t, 'bandLocal')}</span>
+            <span>{trace.band_configured ? label(t, 'bandConfigured') : label(t, 'bandLocal')} · {trace.adapter_mode || 'local'}</span>
             <strong>{trace.minimum_agent_requirement_met ? label(t, 'bandRequirementMet') : label(t, 'bandRequirementPending')}</strong>
           </div>
           <div className="band-roles">
@@ -854,11 +854,24 @@ function BandCollaborationPanel({ trace, onGenerate, onExport, disabled, t }) {
                 <div>
                   <strong>{step.from_agent} → {step.to_agent}</strong>
                   <p>{displayClinicalText(step.handoff, t)}</p>
-                  <small>{displayClinicalText(step.expected_output, t)}</small>
+                  <small>{step.room_event_type || 'handoff'} · {step.status} · {displayClinicalText(step.expected_output, t)}</small>
                 </div>
               </article>
             ))}
           </div>
+          {trace.message_receipts?.length > 0 && (
+            <div className="band-steps">
+              {trace.message_receipts.map((receipt) => (
+                <article key={receipt.message_id}>
+                  <span>{receipt.step_order}</span>
+                  <div>
+                    <strong>{receipt.adapter_mode} receipt · {receipt.delivered ? 'delivered' : 'pending'}</strong>
+                    <small>{receipt.message_id} · {receipt.endpoint}</small>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </>
       )}
     </section>

@@ -177,7 +177,22 @@ class BandCollaborationStep(BaseModel):
     handoff: str
     shared_context: list[str] = Field(default_factory=list)
     expected_output: str
+    sender_key: str = ""
+    receiver_key: str = ""
+    room_event_type: str = "handoff"
+    directed_message: str = ""
     status: Literal["planned", "sent_to_band", "local_trace"] = "planned"
+
+
+class BandMessageReceipt(BaseModel):
+    step_order: int
+    adapter_mode: Literal["local", "live"]
+    sender_agent: str
+    receiver_agent: str
+    endpoint: str
+    message_id: str
+    delivered: bool
+    detail: str = ""
 
 
 class BandCollaborationResponse(BaseModel):
@@ -185,9 +200,11 @@ class BandCollaborationResponse(BaseModel):
     generated_at: datetime
     band_configured: bool
     room_id: str | None = None
+    adapter_mode: Literal["local", "live"] = "local"
     minimum_agent_requirement_met: bool
     agent_roles: list[BandAgentRole]
     collaboration_steps: list[BandCollaborationStep]
+    message_receipts: list[BandMessageReceipt] = Field(default_factory=list)
     audit_notes: list[str] = Field(default_factory=list)
 
 
